@@ -20,7 +20,11 @@ export default function RootLayout({
       <title>next模仿豆包网站</title>
     </head>
     <body>
-      {children}
+    <div className="w-screen h-screen flex flex-col overflow-auto">
+      <div className="w-full min-w-200 h-full flex flex-col">
+        {children}
+      </div>
+    </div>
     </body>
     </html>
   );
