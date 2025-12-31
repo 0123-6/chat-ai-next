@@ -12,7 +12,7 @@ export default function Page() {
   }
 
   return (
-    <div className={'w-screen h-screen flex flex-col gap-y-2 items-start'}>
+    <div className={'w-dvw h-dvh flex flex-col gap-y-2 items-start'}>
       <span className="text-4xl">404页面</span>
       <button onClick={() => goIndexPage()}>跳转到首页</button>
     </div>
