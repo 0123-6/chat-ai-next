@@ -90,7 +90,7 @@ export default function Page(props: IProps) {
     }])
     resetQuestion()
   }
-  const connectRef = useRef<HTMLDivElement>(undefined)
+  const connectRef = useRef<HTMLDivElement | null>(null)
   const [isFetching, setIsFetching, resetIsFetching] = useResetState((): boolean => false)
   const [chatList, setChatList, resetChatList] = useResetState((): IChat[] => [])
   useAsyncEffect(
@@ -145,7 +145,10 @@ export default function Page(props: IProps) {
     fetchQuestionAbortController.current = new AbortController()
 
     try {
-      const response = await fetch('http://localhost:8080/ai/chat', {
+      const api = process.env.NODE_ENV === 'development'
+        ? 'http://localhost:8080/ai/chat'
+        : '/api/ai/chat'
+      const response = await fetch(api, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -234,6 +237,8 @@ export default function Page(props: IProps) {
   useEffect(() => {
     // 配置 marked：启用代码高亮
     marked.setOptions({
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-expect-error
       highlight: (code, lang) => {
         // 如果指定了语言，且 highlight.js 支持该语言，则高亮
         if (lang && hljs.getLanguage(lang)) {
