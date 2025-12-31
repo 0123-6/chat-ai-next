@@ -134,7 +134,6 @@ export default function Page(props: IProps) {
     resetChatList();
   }
   const fetchQuestionWithSSE = async () => {
-    console.log('sss')
     console.log(chatList)
     if (!chatList.length) return;
     if (!chatList.at(-1)!.question) return;
@@ -146,7 +145,7 @@ export default function Page(props: IProps) {
 
     try {
       const api = process.env.NODE_ENV === 'development'
-        ? 'http://localhost:8080/ai/chat'
+        ? 'http://10.59.83.189:8080/ai/chat'
         : '/api/ai/chat'
       const response = await fetch(api, {
         method: 'POST',
