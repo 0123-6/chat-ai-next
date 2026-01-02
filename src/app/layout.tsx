@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "@/app/globals.css";
+import {AntdRegistry} from "@ant-design/nextjs-registry";
 
 export const metadata: Metadata = {
   title: "next模仿豆包网站",
@@ -12,7 +13,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="zh-CN">
     <head>
       <meta charSet="UTF-8"/>
       <link rel="icon" href="/logo.webp"/>
@@ -20,11 +21,13 @@ export default function RootLayout({
       <title>next模仿豆包网站</title>
     </head>
     <body>
-    <div className="w-dvw h-dvh flex flex-col overflow-auto">
-      <div className="w-full h-full flex flex-col">
-        {children}
+    <AntdRegistry>
+      <div className="w-dvw h-dvh flex flex-col overflow-auto">
+        <div className="w-full h-full flex flex-col">
+          {children}
+        </div>
       </div>
-    </div>
+    </AntdRegistry>
     </body>
     </html>
   );
