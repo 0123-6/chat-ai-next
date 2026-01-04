@@ -49,16 +49,6 @@ const historyChatList = [
   '多个子网站运行方式多个子网站运行方式',
   'Nuxt4引入SVG方式',
 ]
-// const hintList = [
-//   '一年中几月份最好找工作？',
-//   '古人如何描写遗憾？',
-//   '哪些习惯能提升睡眠质量？',
-//   '为什么唐宋八大家没有李白？',
-//   '写一份简洁清晰的工作周报',
-//   '生成小众艺术插画',
-//   '电子设备的护眼模式真的能防近视吗？',
-//   '写一份结构严谨的论文大纲',
-// ]
 
 export default function Page(props: IProps) {
   const fullHelpContent = '有什么我能帮你的吗？'
@@ -318,32 +308,16 @@ export default function Page(props: IProps) {
       <div className={'grow h-full py-5 flex flex-col justify-center items-center gap-y-6'}>
         {/* 内容区 */}
         <div ref={connectRef}
-             className={'w-4/5 max-w-200 grow flex flex-col overflow-auto'}
+             className={`
+             w-4/5 max-w-200 flex flex-col overflow-auto
+             ${chatList.length ? 'grow' : ''}
+             `}
         >
           {
             !chatList.length && (
               <div className="w-full h-full flex flex-col justify-center items-center gap-y-2">
                 <span className="mb-5 h-9 text-black font-bold text-3xl">{helpContent}</span>
-                {/*{*/}
-                {/*  new Array(3).fill(12).map((_item, fatherIndex) => (*/}
-                {/*    <div*/}
-                {/*      key={fatherIndex}*/}
-                {/*      className={'flex items-center gap-x-2'}*/}
-                {/*    >*/}
-                {/*      {*/}
-                {/*        hintList.slice(3*(fatherIndex), 3*(fatherIndex+1)).map((item, index) => (*/}
-                {/*          <div*/}
-                {/*            key={index}*/}
-                {/*            className={'bg-[#0000000a] hover:bg-[#00000012] flex justify-center items-center px-4 py-2.5 rounded-xl cursor-pointer'}*/}
-                {/*            onClick={() => clickHint(item)}*/}
-                {/*          >*/}
-                {/*            <span className="text-sm">{item}</span>*/}
-                {/*          </div>*/}
-                {/*        ))*/}
-                {/*      }*/}
-                {/*    </div>*/}
-                {/*  ))*/}
-                {/*}*/}
+                {/*<HintList click={clickHint}/>*/}
               </div>
             )
           }
