@@ -193,10 +193,10 @@ export default function Page(props: IProps) {
     } catch (e) {
       if ((e as Error).name === 'AbortError') {
         console.log('手动停止的错误')
-      } else {
-        console.error('POST 流式请求失败：', (e as Error).name);
+        return
       }
 
+      console.error('POST 流式请求失败：', (e as Error).name);
       setChatList(prevState => [
         ...prevState.slice(0, prevState.length - 1),
         {
