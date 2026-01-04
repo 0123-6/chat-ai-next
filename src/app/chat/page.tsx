@@ -265,7 +265,7 @@ export default function Page(props: IProps) {
   return (
     <div className={'w-full h-full flex'}>
       {/* 左侧 */}
-      <div className={'w-65 h-full flex flex-col overflow-auto bg-[#f9f9f9] border-r border-[#ededed]'}>
+      <div className={'hidden w-65 h-full flex-col overflow-auto bg-[#f9f9f9] border-r border-[#ededed]'}>
         <div className={'w-full px-2 flex flex-col gap-y-2'}>
           {/* 头部 */}
           <div className="h-13 flex justify-between items-center">
@@ -316,7 +316,7 @@ export default function Page(props: IProps) {
           {
             !chatList.length && (
               <div className="w-full h-full flex flex-col justify-center items-center gap-y-2">
-                <span className="mb-5 h-9 text-black font-bold text-3xl">{helpContent}</span>
+                <span className="mb-5 h-9 text-black font-bold text-2xl">{helpContent}</span>
                 {/*<HintList click={clickHint}/>*/}
               </div>
             )
