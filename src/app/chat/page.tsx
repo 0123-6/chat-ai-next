@@ -37,7 +37,6 @@ interface IStreamData {
   data: {
     id: string;
     partialAnswer?: string;
-    answer?: string;
   };
 }
 
