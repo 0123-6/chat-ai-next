@@ -133,7 +133,7 @@ export default function Page(props: IProps) {
 
     try {
       const api = process.env.NODE_ENV === 'development'
-        ? 'http://10.59.83.189:8080/ai/chat'
+        ? 'http://10.204.252.189:8080/ai/chat'
         : '/api/ai/chat'
       const response = await fetch(api, {
         method: 'POST',
