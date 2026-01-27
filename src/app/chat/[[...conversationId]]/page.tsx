@@ -11,7 +11,6 @@ import Logo from "../icon/logo";
 import EllipsisHorSvg from "@/app/chat/icon/ellipsis-hor";
 import Write from "@/app/chat/icon/write";
 import {useAsyncEffect} from "@/composables/useEffectUtil";
-import {useRouter} from "next/navigation";
 
 interface IChat {
   question: string;
@@ -49,7 +48,6 @@ const historyChatList = [
 ]
 
 export default function Page(props: IProps) {
-  const router = useRouter()
   const { conversationId: conversationIdArr } = use(props.params)
   // 可选捕获路由：/chat -> undefined, /chat/xxx -> ['xxx']
   const initialConversationId = conversationIdArr?.[0]
@@ -125,9 +123,9 @@ export default function Page(props: IProps) {
   const clickNewChat = () => {
     closeSSEConnection();
     resetChatList();
-    // 重置会话ID并更新URL
+    // 重置会话ID并更新URL（仅更新URL，不触发导航）
     conversationIdRef.current = undefined
-    router.replace('/chat')
+    window.history.replaceState(null, '', '/next/chat')
   }
   const fetchQuestionWithSSE = async () => {
     console.log(chatList)
@@ -179,8 +177,8 @@ export default function Page(props: IProps) {
           // 后端返回新的 conversationId，更新 URL 和 ref
           if (streamData.code === 200 && streamData.data.conversationId && streamData.data.conversationId !== conversationIdRef.current) {
             conversationIdRef.current = streamData.data.conversationId
-            // 更新 URL，不刷新页面（basePath 由 Next.js 自动处理）
-            router.replace(`/chat/${streamData.data.conversationId}`)
+            // 仅更新 URL 供用户复制，不触发导航
+            window.history.replaceState(null, '', `/next/chat/${streamData.data.conversationId}`)
           }
           if (streamData.code === 200 && streamData.data.partialAnswer?.trim()) {
             setChatList(prevState => [
