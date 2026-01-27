@@ -14,8 +14,7 @@ import {useAsyncEffect} from "@/composables/useEffectUtil";
 
 interface IChat {
   question: string;
-  answer?: string;
-  // 新增：流式分片拼接的临时存储，实现实时打字机效果
+  // 流式分片拼接的临时存储，实现实时打字机效果
   streamingAnswer?: string;
 }
 interface IProps {
@@ -74,7 +73,6 @@ export default function Page(props: IProps) {
     setChatList(prevState => [...prevState, {
       question: question.trim(),
       streamingAnswer: '', // 初始化流式回答
-      answer: undefined,
     }])
     resetQuestion()
   }
@@ -114,7 +112,6 @@ export default function Page(props: IProps) {
     setChatList(prevState => [...prevState, {
       question: newQuestion,
       streamingAnswer: '', // 初始化流式回答
-      answer: undefined,
     }])
   }
   const clickNewChat = () => {
@@ -163,15 +160,6 @@ export default function Page(props: IProps) {
         for (const msg of messages) {
           if (!msg) continue;
           if (msg === 'data: [DONE]') {
-            console.log('end')
-            setChatList(prevState => [
-              ...prevState.slice(0, prevState.length - 1),
-              {
-                ...prevState.at(-1)!,
-                answer: prevState.at(-1)?.streamingAnswer,
-              },
-            ])
-
             closeSSEConnection();
             return;
           }
@@ -210,16 +198,6 @@ export default function Page(props: IProps) {
   // 停止请求
   const clickStopFetch = () => {
     closeSSEConnection();
-    const lastChat = chatList.at(-1)!;
-    if (lastChat.streamingAnswer && !lastChat.answer) {
-      setChatList(prevState => [
-        ...prevState.slice(0, prevState.length - 1),
-        {
-          ...prevState.at(-1)!,
-          answer: prevState.at(-1)?.streamingAnswer,
-        },
-      ])
-    }
   };
   useEffect(() => {
     // 配置 marked：启用代码高亮
@@ -337,7 +315,7 @@ export default function Page(props: IProps) {
                       {/* 回答 */}
                       <div
                         className={'ai-answer-markdown'}
-                        dangerouslySetInnerHTML={{ __html: renderMarkdown(item.streamingAnswer || item.answer) }}
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(item.streamingAnswer) }}
                       />
                     </div>
                   ))
