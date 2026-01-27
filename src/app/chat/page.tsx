@@ -18,7 +18,7 @@ interface IChat {
   streamingAnswer?: string;
 }
 interface IProps {
-  id?: string,
+  conversationId?: string,
 }
 interface IResponseData {
   // 正常情况下为200
@@ -34,7 +34,7 @@ interface IStreamData {
   code: number;
   msg: string;
   data: {
-    id: string;
+    conversationId: string;
     partialAnswer?: string;
   };
 }
@@ -136,7 +136,7 @@ export default function Page(props: IProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          id: props.id,
+          conversationId: props.conversationId,
           question: chatList.at(-1)?.question,
         }),
         signal: fetchQuestionAbortController.current.signal,
