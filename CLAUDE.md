@@ -32,7 +32,7 @@ npm run lint     # 运行 ESLint 检查
 ```
 src/
 ├── app/
-│   ├── chat/page.tsx    # 聊天主界面（客户端组件）
+│   ├── chat/[[...conversationId]]/page.tsx    # 聊天主界面（客户端组件）
 │   ├── chat/icon/       # SVG 图标组件
 │   ├── layout.tsx       # 根布局，包含 Ant Design 注册
 │   └── [slug]/page.tsx  # 404 兜底路由
