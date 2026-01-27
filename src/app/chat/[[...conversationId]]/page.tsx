@@ -38,6 +38,15 @@ interface IStreamData {
     partialAnswer?: string;
   };
 }
+// 历史会话响应结构
+interface IHistoryResponse {
+  code: number;
+  msg: string;
+  data: {
+    conversationId: string;
+    list: Array<{ question: string; answer: string }>;
+  };
+}
 
 const historyChatList = [
   'Nuxt4引入SVG方式',
@@ -50,9 +59,8 @@ const historyChatList = [
 export default function Page(props: IProps) {
   const { conversationId: conversationIdArr } = use(props.params)
   // 可选捕获路由：/chat -> undefined, /chat/xxx -> ['xxx']
-  const initialConversationId = conversationIdArr?.[0]
   // 保存当前会话ID（可能由后端返回更新）
-  const conversationIdRef = useRef<string | undefined>(initialConversationId)
+  const conversationIdRef = useRef<string | undefined>(conversationIdArr?.[0])
 
   const fullHelpContent = '有什么我能帮你的吗？'
   const [helpContent, setHelpContent, resetHelpContent] = useResetState((): string => '')
@@ -85,6 +93,39 @@ export default function Page(props: IProps) {
   const connectRef = useRef<HTMLDivElement | null>(null)
   const [isFetching, setIsFetching, resetIsFetching] = useResetState((): boolean => false)
   const [chatList, setChatList, resetChatList] = useResetState((): IChat[] => [])
+
+  const fetchHistory = async () => {
+    try {
+      const api = process.env.NODE_ENV === 'development'
+        ? 'http://10.204.252.189:8080/ai/getHistoryById'
+        : '/api/ai/getHistoryById'
+      const response = await fetch(api, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: conversationIdRef.current }),
+      })
+
+      if (!response.ok) return
+
+      const result: IHistoryResponse = await response.json()
+      if (result.code === 200 && result.data.list?.length) {
+        // 将历史记录转换为 IChat 格式
+        setChatList(result.data.list.map(item => ({
+          question: item.question,
+          streamingAnswer: item.answer,
+        })))
+      }
+    } catch (e) {
+      console.error('获取历史会话失败：', e)
+    }
+  }
+
+  // 页面加载时获取历史会话
+  useAsyncEffect(() => {
+    if (!conversationIdRef.current) return
+    fetchHistory()
+  }, [])
+
   useAsyncEffect(
     () => {
       fetchQuestionWithSSE()
@@ -131,6 +172,8 @@ export default function Page(props: IProps) {
     console.log(chatList)
     if (!chatList.length) return;
     if (!chatList.at(-1)!.question) return;
+    // 查询id获取的,不是用户触发的
+    if (chatList.at(-1)!.streamingAnswer) return;
 
     closeSSEConnection();
 
