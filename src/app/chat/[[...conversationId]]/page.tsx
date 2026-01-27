@@ -11,6 +11,7 @@ import Logo from "../icon/logo";
 import EllipsisHorSvg from "@/app/chat/icon/ellipsis-hor";
 import Write from "@/app/chat/icon/write";
 import {useAsyncEffect} from "@/composables/useEffectUtil";
+import {useRouter} from "next/navigation";
 
 interface IChat {
   question: string;
@@ -48,9 +49,12 @@ const historyChatList = [
 ]
 
 export default function Page(props: IProps) {
+  const router = useRouter()
   const { conversationId: conversationIdArr } = use(props.params)
   // 可选捕获路由：/chat -> undefined, /chat/xxx -> ['xxx']
-  const conversationId = conversationIdArr?.[0]
+  const initialConversationId = conversationIdArr?.[0]
+  // 保存当前会话ID（可能由后端返回更新）
+  const conversationIdRef = useRef<string | undefined>(initialConversationId)
 
   const fullHelpContent = '有什么我能帮你的吗？'
   const [helpContent, setHelpContent, resetHelpContent] = useResetState((): string => '')
@@ -121,6 +125,9 @@ export default function Page(props: IProps) {
   const clickNewChat = () => {
     closeSSEConnection();
     resetChatList();
+    // 重置会话ID并更新URL
+    conversationIdRef.current = undefined
+    router.replace('/chat')
   }
   const fetchQuestionWithSSE = async () => {
     console.log(chatList)
@@ -140,7 +147,7 @@ export default function Page(props: IProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          conversationId,
+          conversationId: conversationIdRef.current,
           question: chatList.at(-1)?.question,
         }),
         signal: fetchQuestionAbortController.current.signal,
@@ -169,6 +176,12 @@ export default function Page(props: IProps) {
           }
           const dataStr = msg.replace(/^data: /, '');
           const streamData: IStreamData = JSON.parse(dataStr);
+          // 后端返回新的 conversationId，更新 URL 和 ref
+          if (streamData.code === 200 && streamData.data.conversationId && streamData.data.conversationId !== conversationIdRef.current) {
+            conversationIdRef.current = streamData.data.conversationId
+            // 更新 URL，不刷新页面（basePath 由 Next.js 自动处理）
+            router.replace(`/chat/${streamData.data.conversationId}`)
+          }
           if (streamData.code === 200 && streamData.data.partialAnswer?.trim()) {
             setChatList(prevState => [
               ...prevState.slice(0, prevState.length - 1),

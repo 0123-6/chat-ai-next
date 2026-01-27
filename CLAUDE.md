@@ -48,7 +48,6 @@ src/
 ```typescript
 interface IChat {
   question: string;
-  answer?: string;           // 最终响应
   streamingAnswer?: string;  // SSE 实时累积内容
 }
 ```
