@@ -66,7 +66,7 @@ export default function Page(props: IProps) {
       }
     }, 40)
   }, [])
-
+  
   const [question, setQuestion, resetQuestion] = useResetState(() => '')
   const clickSend = () => {
     // 没有内容,直接退出
