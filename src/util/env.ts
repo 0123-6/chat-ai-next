@@ -57,7 +57,7 @@ export const goLoginPage = () => {
     }, location.origin)
   } else {
     if (projectConfig.loginMode === 'router') {
-      router.navigate(projectConfig.loginRoutePath)
+      // router.navigate(projectConfig.loginRoutePath)
     } else {
       location.href = location.origin + projectConfig.loginUrl
     }

@@ -1,35 +1,47 @@
 import {goLoginPage} from '@/util/env.ts'
 import {exportFile} from '@/util/file.ts'
 import {projectConfig} from '../../project.config.ts'
-import type {ISelectOption} from '@/components/base-form/useSelect.ts'
 import {errorMessage, successMessage} from '@/util/message.ts'
 
+// select的option的标准格式
+export interface ISelectOption {
+  label: string,
+  title: string,
+  value: string | number | boolean,
+  key: string | number | boolean,
+  disabled?: boolean,
+  children?: ISelectOption[],
+  isLeaf?: boolean,
+  // 用于匹配样式
+  type?: 'primary' | 'success' | 'warning' | 'error' | 'text',
+}
+
 // 防抖函数
-export function debounce(fn: () => void, delay: number = 1000) {
+export function debounce<T extends (...args: any[]) => any>(fn: T, delay: number = 1000) {
   let timer: ReturnType<typeof setTimeout> | null = null
 
-  return function (this: any, ...args: any[]) {
+  return function (this: any, ...args: Parameters<T>) {
     if (timer) {
       clearTimeout(timer)
       timer = null
     }
     timer = setTimeout(() => {
       fn.apply(this, args)
-      clearTimeout(timer)
+      clearTimeout(timer!)
       timer = null
     }, delay)
   }
 }
 
 // 节流函数
-export function throttle(fn: () => void, delay: number = 1000) {
+export function throttle<T extends (...args: any[]) => any>(fn: T, delay: number = 1000) {
   let timer: ReturnType<typeof setTimeout> | null = null
 
-  return function (this: any, ...args: any[]) {
+  return function (this: any, ...args: Parameters<T>) {
     if (!timer) {
       fn.apply(this, args)
       timer = setTimeout(() => {
-        clearTimeout(timer)
+        clearTimeout(timer!)
         timer = null
       }, delay)
     }

@@ -1,4 +1,4 @@
-import {IUseSyncExternalStoreProps} from "@/util/hooks/IUseSyncExternalStoreProps";
+import type {IUseSyncExternalStoreProps} from "@/util/hooks/IUseSyncExternalStoreProps";
 
 // 用户信息类型
 export interface IUserInfo {
