@@ -100,9 +100,7 @@ export default function Page(props: IProps) {
 
   const fetchHistory = async () => {
     try {
-      const api = process.env.NODE_ENV === 'development'
-        ? 'http://localhost:8080/ai/getHistoryById'
-        : '/api/ai/getHistoryById'
+      const api = '/api/ai/getHistoryById'
       const response = await fetch(api, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -190,9 +188,7 @@ export default function Page(props: IProps) {
     fetchQuestionAbortController.current = new AbortController()
 
     try {
-      const api = process.env.NODE_ENV === 'development'
-        ? 'http://localhost:8080/ai/chat'
-        : '/api/ai/chat'
+      const api = '/api/ai/chat'
       const response = await fetch(api, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

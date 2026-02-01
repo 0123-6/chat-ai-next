@@ -42,9 +42,10 @@ export const userStore: IProps = {
     }
 
     // 获取用户信息
-    const api = process.env.NODE_ENV === 'development'
-      ? 'http://localhost:8080/user/getUserInfo'
-      : '/api/user/getUserInfo';
+    // const api = process.env.NODE_ENV === 'development'
+    //   ? 'http://localhost:8080/user/getUserInfo'
+    //   : '/api/user/getUserInfo';
+    const api = '/api/user/getUserInfo'
 
     const response = await fetch(api, {
       method: 'POST',
@@ -57,4 +58,7 @@ export const userStore: IProps = {
     userStore.set(result.responseData.data as IUserInfo)
   },
 }
-userStore.fetch()
+// 仅在客户端执行
+if (typeof window !== 'undefined') {
+  userStore.fetch()
+}
