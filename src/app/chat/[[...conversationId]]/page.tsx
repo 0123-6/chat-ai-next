@@ -4,13 +4,15 @@ import '../index.css'
 import {useResetState} from "@/composables/useResetState";
 import hljs from "highlight.js";
 import { marked } from "marked";
-import {useEffect, useLayoutEffect, useRef, use} from "react";
+import {useEffect, useLayoutEffect, useRef, use, useSyncExternalStore} from "react";
 import 'highlight.js/styles/default.css';
 import xss from "xss";
 import Logo from "../icon/logo";
 import EllipsisHorSvg from "@/app/chat/icon/ellipsis-hor";
 import Write from "@/app/chat/icon/write";
 import {useAsyncEffect} from "@/composables/useEffectUtil";
+import {userStore} from "@/store/user";
+import {errorMessage} from "@/util/message";
 
 interface IChat {
   question: string;
@@ -57,6 +59,8 @@ const historyChatList = [
 ]
 
 export default function Page(props: IProps) {
+  const userInfo = useSyncExternalStore(userStore.subscribe, userStore.getSnapshot, userStore.getSnapshot)
+  console.log(userInfo)
   const { conversationId: conversationIdArr } = use(props.params)
   // 可选捕获路由：/chat -> undefined, /chat/xxx -> ['xxx']
   // 保存当前会话ID（可能由后端返回更新）
@@ -97,7 +101,7 @@ export default function Page(props: IProps) {
   const fetchHistory = async () => {
     try {
       const api = process.env.NODE_ENV === 'development'
-        ? 'http://10.204.252.189:8080/ai/getHistoryById'
+        ? 'http://localhost:8080/ai/getHistoryById'
         : '/api/ai/getHistoryById'
       const response = await fetch(api, {
         method: 'POST',
@@ -114,6 +118,11 @@ export default function Page(props: IProps) {
           question: item.question,
           streamingAnswer: item.answer,
         })))
+      } else if (result.code !== 200) {
+        errorMessage(result.msg)
+        // conversationId 无效（过期、已删除或非法），从 URL 中移除
+        conversationIdRef.current = undefined
+        window.history.replaceState(null, '', '/next/chat')
       }
     } catch (e) {
       console.error('获取历史会话失败：', e)
@@ -182,7 +191,7 @@ export default function Page(props: IProps) {
 
     try {
       const api = process.env.NODE_ENV === 'development'
-        ? 'http://10.204.252.189:8080/ai/chat'
+        ? 'http://localhost:8080/ai/chat'
         : '/api/ai/chat'
       const response = await fetch(api, {
         method: 'POST',
