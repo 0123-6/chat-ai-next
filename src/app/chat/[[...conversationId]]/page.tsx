@@ -14,6 +14,7 @@ import {useAsyncEffect} from "@/composables/useEffectUtil";
 import {userStore} from "@/store/user";
 import {errorMessage} from "@/util/message";
 import {Button} from "antd";
+import LoginModal from "@/components/LoginModal";
 
 interface IChat {
   question: string;
@@ -61,6 +62,7 @@ const historyChatList = [
 
 export default function Page(props: IProps) {
   const [mounted, setMounted] = useState(false)
+  const [loginModalOpen, setLoginModalOpen] = useState(false)
   useEffect(() => { setMounted(true) }, [])
   const userInfo = useSyncExternalStore(userStore.subscribe, userStore.getSnapshot, userStore.getSnapshot)
   console.log('userInfo', userInfo)
@@ -312,6 +314,7 @@ export default function Page(props: IProps) {
           mounted && !userInfo && (
             <Button
               type={'primary'}
+              onClick={() => setLoginModalOpen(true)}
             >登录</Button>
           )
         }
@@ -470,6 +473,8 @@ export default function Page(props: IProps) {
           </div>
         </div>
       </div>
+      {/* 登录弹窗 */}
+      <LoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
     </div>
   )
 }
