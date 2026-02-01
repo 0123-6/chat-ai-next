@@ -4,7 +4,7 @@ import '../index.css'
 import {useResetState} from "@/composables/useResetState";
 import hljs from "highlight.js";
 import { marked } from "marked";
-import {useEffect, useLayoutEffect, useRef, use, useSyncExternalStore} from "react";
+import {useEffect, useLayoutEffect, useRef, use, useSyncExternalStore, useState} from "react";
 import 'highlight.js/styles/default.css';
 import xss from "xss";
 import Logo from "../icon/logo";
@@ -13,6 +13,7 @@ import Write from "@/app/chat/icon/write";
 import {useAsyncEffect} from "@/composables/useEffectUtil";
 import {userStore} from "@/store/user";
 import {errorMessage} from "@/util/message";
+import {Button} from "antd";
 
 interface IChat {
   question: string;
@@ -59,8 +60,10 @@ const historyChatList = [
 ]
 
 export default function Page(props: IProps) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
   const userInfo = useSyncExternalStore(userStore.subscribe, userStore.getSnapshot, userStore.getSnapshot)
-  console.log(userInfo)
+  console.log('userInfo', userInfo)
   const { conversationId: conversationIdArr } = use(props.params)
   // 可选捕获路由：/chat -> undefined, /chat/xxx -> ['xxx']
   // 保存当前会话ID（可能由后端返回更新）
@@ -302,93 +305,114 @@ export default function Page(props: IProps) {
   };
 
   return (
-    <div className={'w-full h-full flex'}>
-      {/* 左侧 */}
-      <div className={'hidden w-65 h-full flex-col overflow-auto bg-[#f9f9f9] border-r border-[#ededed]'}>
-        <div className={'w-full px-2 flex flex-col gap-y-2'}>
-          {/* 头部 */}
-          <div className="h-13 flex justify-between items-center">
-            {/*左侧logo*/}
-            <button className="w-9 h-9 flex justify-center items-center hover:bg-[#00000012] rounded-xl">
-              <div className={'w-6 h-6'}>
-                <Logo/>
-              </div>
-            </button>
-          </div>
-          {/* 按钮区 */}
-          <div
-            className={'px-3 h-9 flex items-center gap-x-2 hover:bg-[#00000012] rounded-xl'}
-            onClick={clickNewChat}
-          >
-            <div className={'w-5 h-5'}>
-              <Write/>
+    <div className={'w-full h-full flex flex-col'}>
+      {/*头部*/}
+      <div className={'w-full px-6 h-12 flex justify-end items-center'}>
+        {
+          mounted && !userInfo && (
+            <Button
+              type={'primary'}
+            >登录</Button>
+          )
+        }
+        {
+          mounted && userInfo && (
+            <div>已经登录</div>
+          )
+        }
+      </div>
+      <div
+        className={'w-full flex'}
+        style={{
+          height: 'calc(100% - 48px)',
+        }}
+      >
+        {/* 左侧 */}
+        <div className={'hidden w-65 h-full flex-col overflow-auto bg-[#f9f9f9] border-r border-[#ededed]'}>
+          <div className={'w-full px-2 flex flex-col gap-y-2'}>
+            {/* 头部 */}
+            <div className="h-13 flex justify-between items-center">
+              {/*左侧logo*/}
+              <button className="w-9 h-9 flex justify-center items-center hover:bg-[#00000012] rounded-xl">
+                <div className={'w-6 h-6'}>
+                  <Logo/>
+                </div>
+              </button>
             </div>
-            <span>新聊天</span>
-          </div>
-          <span className="text-[#8f8f8f]">你的聊天</span>
-          {
-            historyChatList.map((item, index) => (
-              <div
-                key={index}
-                className={'px-2 h-9 flex items-center hover:bg-[#00000012] rounded-xl group relative'}
-              >
-                <span className="w-full group-hover:w-48 text-sm line-clamp-1">{item}</span>
-                <div className="absolute right-2 hidden group-hover:flex">
-                  <div className={'w-5 h-5 cursor-pointer'}>
-                    <EllipsisHorSvg/>
+            {/* 按钮区 */}
+            <div
+              className={'px-3 h-9 flex items-center gap-x-2 hover:bg-[#00000012] rounded-xl'}
+              onClick={clickNewChat}
+            >
+              <div className={'w-5 h-5'}>
+                <Write/>
+              </div>
+              <span>新聊天</span>
+            </div>
+            <span className="text-[#8f8f8f]">你的聊天</span>
+            {
+              historyChatList.map((item, index) => (
+                <div
+                  key={index}
+                  className={'px-2 h-9 flex items-center hover:bg-[#00000012] rounded-xl group relative'}
+                >
+                  <span className="w-full group-hover:w-48 text-sm line-clamp-1">{item}</span>
+                  <div className="absolute right-2 hidden group-hover:flex">
+                    <div className={'w-5 h-5 cursor-pointer'}>
+                      <EllipsisHorSvg/>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
-          }
+              ))
+            }
+          </div>
         </div>
-      </div>
-      {/* 右侧 */}
-      <div className={'grow h-full py-5 flex flex-col justify-center items-center gap-y-6'}>
-        {/* 内容区 */}
-        <div ref={connectRef}
-             className={`
+        {/* 右侧 */}
+        <div className={'grow h-full py-5 flex flex-col justify-center items-center gap-y-6'}>
+          {/* 内容区 */}
+          <div ref={connectRef}
+               className={`
              w-4/5 max-w-200 flex flex-col overflow-auto
              ${chatList.length ? 'grow' : ''}
              `}
-        >
-          {
-            !chatList.length && (
-              <div className="w-full h-full flex flex-col justify-center items-center gap-y-2">
-                <span className="mb-5 h-9 text-black font-bold text-2xl">{helpContent}</span>
-                {/*<HintList click={clickHint}/>*/}
-              </div>
-            )
-          }
-          {
-            !!chatList.length && (
-              <div className={'w-full h-full flex flex-col gap-y-13'}>
-                {
-                  chatList.map((item, index) => (
-                    <div
-                      key={index}
-                      className={'flex flex-col gap-y-13'}
-                    >
-                      {/* 问题 */}
-                      <div className={'flex justify-end items-center relative'}>
-                        <div className={'max-w-112.5 bg-[#f5f5f5] px-4 py-2.5 rounded-xl'}>
-                          <span className="w-full break-all">{item.question}</span>
-                        </div>
-                      </div>
-                      {/* 回答 */}
+          >
+            {
+              !chatList.length && (
+                <div className="w-full h-full flex flex-col justify-center items-center gap-y-2">
+                  <span className="mb-5 h-9 text-black font-bold text-2xl">{helpContent}</span>
+                  {/*<HintList click={clickHint}/>*/}
+                </div>
+              )
+            }
+            {
+              !!chatList.length && (
+                <div className={'w-full h-full flex flex-col gap-y-13'}>
+                  {
+                    chatList.map((item, index) => (
                       <div
-                        className={'ai-answer-markdown'}
-                        dangerouslySetInnerHTML={{ __html: renderMarkdown(item.streamingAnswer) }}
-                      />
-                    </div>
-                  ))
-                }
-              </div>
-            )
-          }
-        </div>
-        {/* 用户交互区 */}
-        <div className={'w-4/5 max-w-200 rounded-2xl border border-[#e0e0e0] flex flex-col p-3'}>
+                        key={index}
+                        className={'flex flex-col gap-y-13'}
+                      >
+                        {/* 问题 */}
+                        <div className={'flex justify-end items-center relative'}>
+                          <div className={'max-w-112.5 bg-[#f5f5f5] px-4 py-2.5 rounded-xl'}>
+                            <span className="w-full break-all">{item.question}</span>
+                          </div>
+                        </div>
+                        {/* 回答 */}
+                        <div
+                          className={'ai-answer-markdown'}
+                          dangerouslySetInnerHTML={{ __html: renderMarkdown(item.streamingAnswer) }}
+                        />
+                      </div>
+                    ))
+                  }
+                </div>
+              )
+            }
+          </div>
+          {/* 用户交互区 */}
+          <div className={'w-4/5 max-w-200 rounded-2xl border border-[#e0e0e0] flex flex-col p-3'}>
           <textarea
             value={question}
             onChange={e => setQuestion(e.target.value)}
@@ -397,51 +421,52 @@ export default function Page(props: IProps) {
             className="box-border min-h-14 max-h-40 resize-none"
             onKeyDown={textareaKeyDown}
           ></textarea>
-          {/*@keydown.enter.prevent="clickSend"*/}
-          <div className={'flex justify-end items-center'}>
-            {/* 发送按钮 */}
-            <button
-              className={`
+            {/*@keydown.enter.prevent="clickSend"*/}
+            <div className={'flex justify-end items-center'}>
+              {/* 发送按钮 */}
+              <button
+                className={`
               w-8 h-8 justify-center items-center rounded-full
                ${!!question ? 'bg-[#0057ff] text-white' : 'bg-[#d9d9d9] text-[#eeeeee] cursor-not-allowed'}
                ${isFetching ? 'hidden' : 'flex'}
                `}
-              onClick={clickSend}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="1em"
-                height="1em"
-                fill="none"
-                viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  d="m3.543 8.883 7.042-7.047a2 2 0 0 1 2.828 0l7.043 7.046a1 1 0 0 1 0 1.415l-.701.701a1 1 0 0 1-1.414 0L13.3 5.956v15.792a1 1 0 0 1-1 1h-.99a1 1 0 0 1-1-1V6.342l-4.654 4.656a1 1 0 0 1-1.414 0l-.7-.7a1 1 0 0 1 0-1.415">
-                </path>
-              </svg>
-            </button>
-            {/* 停止按钮 */}
-            <button
-              className={`
+                onClick={clickSend}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="1em"
+                  height="1em"
+                  fill="none"
+                  viewBox="0 0 24 24">
+                  <path
+                    fill="currentColor"
+                    d="m3.543 8.883 7.042-7.047a2 2 0 0 1 2.828 0l7.043 7.046a1 1 0 0 1 0 1.415l-.701.701a1 1 0 0 1-1.414 0L13.3 5.956v15.792a1 1 0 0 1-1 1h-.99a1 1 0 0 1-1-1V6.342l-4.654 4.656a1 1 0 0 1-1.414 0l-.7-.7a1 1 0 0 1 0-1.415">
+                  </path>
+                </svg>
+              </button>
+              {/* 停止按钮 */}
+              <button
+                className={`
               w-8 h-8 justify-center items-center rounded-lg hover:bg-[#f6f6f6] text-[24px]
               ${isFetching ? 'flex' : 'hidden'}
               `}
-              onClick={clickStopFetch}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="1em"
-                height="1em"
-                fill="none"
-                viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  fillRule="evenodd"
-                  d="M12 23c6.075 0 11-4.925 11-11S18.075 1 12 1 1 5.925 1 12s4.925 11 11 11m0-20a9 9 0 1 1 0 18 9 9 0 0 1 0-18m-2 5.5A1.5 1.5 0 0 0 8.5 10v4a1.5 1.5 0 0 0 1.5 1.5h4a1.5 1.5 0 0 0 1.5-1.5v-4A1.5 1.5 0 0 0 14 8.5z"
-                  clipRule="evenodd">
-                </path>
-              </svg>
-            </button>
+                onClick={clickStopFetch}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="1em"
+                  height="1em"
+                  fill="none"
+                  viewBox="0 0 24 24">
+                  <path
+                    fill="currentColor"
+                    fillRule="evenodd"
+                    d="M12 23c6.075 0 11-4.925 11-11S18.075 1 12 1 1 5.925 1 12s4.925 11 11 11m0-20a9 9 0 1 1 0 18 9 9 0 0 1 0-18m-2 5.5A1.5 1.5 0 0 0 8.5 10v4a1.5 1.5 0 0 0 1.5 1.5h4a1.5 1.5 0 0 0 1.5-1.5v-4A1.5 1.5 0 0 0 14 8.5z"
+                    clipRule="evenodd">
+                  </path>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>

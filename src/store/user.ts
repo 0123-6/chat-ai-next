@@ -54,8 +54,12 @@ export const userStore: IProps = {
     })
     if (!response.ok) return
     const result = await response.json()
+    if (result.code !== 200) {
+      console.log('未登录')
+      return
+    }
 
-    userStore.set(result.responseData.data as IUserInfo)
+    userStore.set(result.data as IUserInfo)
   },
 }
 // 仅在客户端执行
