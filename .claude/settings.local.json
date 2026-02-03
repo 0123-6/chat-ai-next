@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(tree:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(findstr:*)",
+      "Bash(dir:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run lint:*)",
+      "Bash(pnpm add:*)"
     ]
   }
 }
