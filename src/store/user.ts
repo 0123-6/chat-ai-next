@@ -12,13 +12,16 @@ export interface IUserInfo {
   // 状态
   status: 'normal' | 'disabled';
 }
-
-type IProps = IUseSyncExternalStoreProps<IUserInfo | null> & {
-  fetch: () => Promise<void>,
-  isInitialized: () => boolean,
+interface IUserStore {
+  userInfo: IUserInfo,
+  initialized: boolean,
 }
 
-let userObject: IUserInfo | null = null
+type IProps = IUseSyncExternalStoreProps<IUserStore> & {
+  fetch: () => Promise<void>,
+}
+
+let userInfo: IUserInfo | null = null
 let initialized = false
 const subSet = new Set<() => void>()
 
@@ -30,31 +33,32 @@ export const userStore: IProps = {
       subSet.delete(sub)
     }
   },
-  getSnapshot: () => userObject,
-  set: (newUser: IUserInfo | null) => {
-    if (userObject === newUser) {
+  getSnapshot: () => ({
+    userInfo,
+    initialized,
+  }),
+  set: (newUserStore: IUserStore) => {
+    if (!newUserStore) {
       return
     }
-
-    userObject = newUser
+    
+    userInfo = newUserStore.userInfo
+    initialized = newUserStore.initialized
+    
     for (const sub of subSet) {
       sub()
     }
-    if (userObject) {
-      initialized = true
-    }
   },
-  isInitialized: () => initialized,
   // 获取用户信息
   fetch: async () => {
     const baseFetchObject = await baseFetch({
       url: 'user/getUserInfo',
+      showErrorMessage: false,
     })
-    if (!baseFetchObject.isOk) {
-      return
-    }
-
-    userStore.set(baseFetchObject.responseData.data as IUserInfo)
+    userStore.set({
+      userInfo: baseFetchObject.responseData?.data as IUserInfo,
+      initialized: true,
+    })
   },
 }
 // 仅在客户端执行
