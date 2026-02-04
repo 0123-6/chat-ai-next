@@ -1,12 +1,8 @@
 /* AI 回答 Markdown 样式 */
 .ai-answer-markdown {
   line-height: 1.8;
-  padding: 16px;
-  background-color: #fafafa;
-  border-radius: 8px;
-  border: 1px solid #f0f0f0;
   color: #333;
-  font-size: 14px;
+  font-size: 15px;
   word-break: break-all;
 }
 
