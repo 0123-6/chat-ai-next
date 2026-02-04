@@ -1,11 +1,11 @@
-import type { Metadata } from "next";
-import "@/app/globals.css";
-import {AntdRegistry} from "@ant-design/nextjs-registry";
+import type { Metadata } from 'next'
+import '@/app/globals.css'
+import {AntdRegistry} from '@ant-design/nextjs-registry'
 
 export const metadata: Metadata = {
-  title: "next模仿豆包网站",
-  description: "next模仿豆包网站",
-};
+  title: 'next模仿豆包网站',
+  description: 'next模仿豆包网站',
+}
 
 export default function RootLayout({
   children,
@@ -30,5 +30,5 @@ export default function RootLayout({
     </AntdRegistry>
     </body>
     </html>
-  );
+  )
 }
