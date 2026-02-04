@@ -1,4 +1,5 @@
-import type {IUseSyncExternalStoreProps} from "@/util/hooks/IUseSyncExternalStoreProps";
+import type {IUseSyncExternalStoreProps} from '@/util/hooks/IUseSyncExternalStoreProps'
+import {baseFetch} from '@/util/api.ts'
 
 // 用户信息类型
 export interface IUserInfo {
@@ -14,9 +15,11 @@ export interface IUserInfo {
 
 type IProps = IUseSyncExternalStoreProps<IUserInfo | null> & {
   fetch: () => Promise<void>,
+  isInitialized: () => boolean,
 }
 
 let userObject: IUserInfo | null = null
+let initialized = false
 const subSet = new Set<() => void>()
 
 export const userStore: IProps = {
@@ -29,37 +32,29 @@ export const userStore: IProps = {
   },
   getSnapshot: () => userObject,
   set: (newUser: IUserInfo | null) => {
+    if (userObject === newUser) {
+      return
+    }
+
     userObject = newUser
     for (const sub of subSet) {
       sub()
     }
+    if (userObject) {
+      initialized = true
+    }
   },
+  isInitialized: () => initialized,
   // 获取用户信息
   fetch: async () => {
-    // 用户信息已经存在
-    if (userStore.getSnapshot()) {
-      return
-    }
-
-    // 获取用户信息
-    // const api = process.env.NODE_ENV === 'development'
-    //   ? 'http://localhost:8080/user/getUserInfo'
-    //   : '/api/user/getUserInfo';
-    const api = '/api/user/getUserInfo'
-
-    const response = await fetch(api, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({}),
+    const baseFetchObject = await baseFetch({
+      url: 'user/getUserInfo',
     })
-    if (!response.ok) return
-    const result = await response.json()
-    if (result.code !== 200) {
-      console.log('未登录')
+    if (!baseFetchObject.isOk) {
       return
     }
 
-    userStore.set(result.data as IUserInfo)
+    userStore.set(baseFetchObject.responseData.data as IUserInfo)
   },
 }
 // 仅在客户端执行
