@@ -3,7 +3,7 @@
 import '../index.css'
 import hljs from 'highlight.js'
 import {marked} from 'marked'
-import {useEffect, useLayoutEffect, useRef, use, useSyncExternalStore, useState} from 'react'
+import {useEffect, useRef, use, useSyncExternalStore, useState} from 'react'
 import 'highlight.js/styles/default.css'
 import xss from 'xss'
 import {userStore} from '@/store/user'
@@ -11,9 +11,10 @@ import {historyStore} from '@/store/history'
 import {Button} from 'antd'
 import LoginModal from '@/components/LoginModal'
 import ChatDrawer from '@/components/ChatDrawer'
-import CopyButton from '@/components/CopyButton'
+import ChatMessage from '@/components/ChatMessage.tsx'
 import {useAsyncEffect} from '@/util/hooks/useEffectUtil'
 import {useResetState} from '@/util/hooks/useResetState'
+import {useScrollControl} from '@/util/hooks/useScrollControl.ts'
 import {baseFetch, streamFetch} from '@/util/api.ts'
 
 interface IChat {
@@ -76,14 +77,18 @@ export default function Page(props: IProps) {
     }])
     resetQuestion()
   }
-  const connectRef = useRef<HTMLDivElement | null>(null)
   const [isFetching, setIsFetching, _resetIsFetching] = useResetState((): boolean => false)
   const [chatList, setChatList, resetChatList] = useResetState((): IChat[] => [])
-  // 自动滚动控制
-  const [autoScroll, setAutoScroll] = useState(true)
-  const [showScrollBtn, setShowScrollBtn] = useState(false)
   // 当前激活的复制按钮（点击或悬浮时显示）: 'q-0' 表示第0个问题, 'a-0' 表示第0个回答
   const [activeCopyIndex, setActiveCopyIndex] = useState<string | null>(null)
+  // 滚动控制
+  const {
+    containerRef,
+    autoScroll: _autoScroll,
+    setAutoScroll,
+    showScrollBtn,
+    handleScrollToBottom,
+  } = useScrollControl(isFetching, [chatList])
 
   const fetchHistory = async () => {
     const result = await baseFetch({
@@ -120,81 +125,14 @@ export default function Page(props: IProps) {
       immediate: false,
     },
   )
-  // 滚动到底部（可选平滑效果）
-  const scrollToBottom = (smooth = false) => {
-    if (!connectRef.current) return
-    if (smooth) {
-      connectRef.current.scrollTo({
-        top: connectRef.current.scrollHeight,
-        behavior: 'smooth',
-      })
-    } else {
-      connectRef.current.scrollTop = connectRef.current.scrollHeight
-    }
-  }
-
-  // 用户滚动事件监听
-  useEffect(() => {
-    const container = connectRef.current
-    if (!container) return
-
-    let lastScrollTop = container.scrollTop
-    const handleScroll = () => {
-      const {scrollTop, scrollHeight, clientHeight} = container
-      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50
-      const currentScrollTop = scrollTop
-
-      // 用户向上滚动时，停止自动滚动
-      if (currentScrollTop < lastScrollTop) {
-        setAutoScroll(false)
-      }
-
-      // 用户手动滚动到底部时，重新激活自动滚动
-      if (isAtBottom && isFetching) {
-        setAutoScroll(true)
-      }
-
-      // 根据是否在底部显示/隐藏按钮
-      setShowScrollBtn(!isAtBottom)
-
-      lastScrollTop = currentScrollTop
-    }
-
-    container.addEventListener('scroll', handleScroll)
-    return () => container.removeEventListener('scroll', handleScroll)
-     
-  }, [isFetching])
-
-  // 自动滚动到底部
-  useLayoutEffect(() => {
-    if (!connectRef.current || !autoScroll) return
-    scrollToBottom()
-  }, [chatList, autoScroll])
-
-  // 回答完成后滚动到底部（让用户看到复制图标）
-  useEffect(() => {
-    if (!isFetching && autoScroll && chatList.length > 0) {
-      // 延迟一下等待 DOM 更新
-      setTimeout(() => scrollToBottom(), 50)
-    }
-  }, [isFetching, autoScroll, chatList.length])
-
-  // 点击滚动到底部按钮
-  const handleScrollToBottom = () => {
-    scrollToBottom(true) // 平滑滚动
-    // 如果正在输出，恢复自动滚动
-    if (isFetching) {
-      setAutoScroll(true)
-    }
-    setShowScrollBtn(false)
-  }
 
   // 发送新消息时重置自动滚动
   useEffect(() => {
     if (chatList.length > 0) {
       setAutoScroll(true)
     }
-  }, [chatList.length])
+  }, [chatList.length, setAutoScroll])
+
   const fetchQuestionAbortController = useRef<AbortController>(undefined)
   // 关闭SSE连接（统一管理，避免内存泄漏）
   const closeSSEConnection = () => {
@@ -362,7 +300,7 @@ export default function Page(props: IProps) {
       >
         <div className={'grow h-full py-5 flex flex-col justify-center items-center gap-y-6'}>
           {/* 内容区 */}
-          <div ref={connectRef}
+          <div ref={containerRef}
                className={`w-4/5 max-w-200 relative flex flex-col overflow-auto ${chatList.length ? 'grow' : ''}`}>
             {
               !chatList.length && (
@@ -375,51 +313,19 @@ export default function Page(props: IProps) {
               !!chatList.length && (
                 <div className={'w-full flex flex-col gap-y-13'}>
                   {
-                    chatList.map((item, index) => {
-                      const isLastItem = index === chatList.length - 1
-                      const isAnswerComplete = !isFetching || !isLastItem
-                      const showQuestionCopy = activeCopyIndex === `q-${index}`
-                      const showAnswerCopy = isAnswerComplete && (activeCopyIndex === `a-${index}` || isLastItem)
-
-                      return (
-                        <div
-                          key={index}
-                          className={'flex flex-col gap-y-13'}
-                        >
-                          {/* 问题 */}
-                          <div
-                            className={'flex flex-col items-end group'}
-                            onMouseEnter={() => setActiveCopyIndex(`q-${index}`)}
-                            onMouseLeave={() => setActiveCopyIndex(null)}
-                            onClick={() => setActiveCopyIndex(activeCopyIndex === `q-${index}` ? null : `q-${index}`)}
-                          >
-                            <div className={'relative max-w-112.5 bg-[#f5f5f5] px-4 py-2.5 rounded-xl'}>
-                              <span className="w-full break-all">{item.question}</span>
-                              {/* 复制按钮 */}
-                              {showQuestionCopy && (
-                                <CopyButton text={item.question} className="absolute right-0 -bottom-6" />
-                              )}
-                            </div>
-                          </div>
-                          {/* 回答 */}
-                          <div
-                            className={'relative group'}
-                            onMouseEnter={() => setActiveCopyIndex(`a-${index}`)}
-                            onMouseLeave={() => !isLastItem && setActiveCopyIndex(null)}
-                            onClick={() => setActiveCopyIndex(activeCopyIndex === `a-${index}` ? null : `a-${index}`)}
-                          >
-                            <div
-                              className={'ai-answer-markdown'}
-                              dangerouslySetInnerHTML={{__html: renderMarkdown(item.streamingAnswer)}}
-                            />
-                            {/* 复制按钮 */}
-                            {showAnswerCopy && item.streamingAnswer && (
-                              <CopyButton text={item.streamingAnswer} className="absolute left-0 -bottom-6" />
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })
+                    chatList.map((item, index) => (
+                      <ChatMessage
+                        key={index}
+                        question={item.question}
+                        answerHtml={renderMarkdown(item.streamingAnswer)}
+                        answerRaw={item.streamingAnswer}
+                        index={index}
+                        isAnswerComplete={!isFetching || index !== chatList.length - 1}
+                        isLastItem={index === chatList.length - 1}
+                        activeCopyIndex={activeCopyIndex}
+                        onActiveCopyIndexChange={setActiveCopyIndex}
+                      />
+                    ))
                   }
                 </div>
               )
