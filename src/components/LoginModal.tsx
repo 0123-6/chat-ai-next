@@ -1,9 +1,12 @@
-'use client';
+'use client'
 
-import {Modal, Input, Button, Checkbox, Space} from 'antd';
-import {useState, useEffect, useRef} from 'react';
-import {userStore} from '@/store/user';
-import {errorMessage, successMessage} from '@/util/message';
+import {Modal, Input, Button, Checkbox, Space} from 'antd'
+import {useState, useEffect, useRef, useSyncExternalStore} from 'react'
+import {userStore} from '@/store/user'
+import {successMessage} from '@/util/message'
+import {historyStore} from '@/store/history'
+import {deviceStore} from '@/store/device'
+import {baseFetch} from '@/util/api'
 
 interface IProps {
   open: boolean;
@@ -21,11 +24,15 @@ export default function LoginModal({open, onClose}: IProps) {
   const [step, setStep] = useState<Step>('phone')
   const [phone, setPhone] = useState('')
   const [agreed, setAgreed] = useState(false)
-  const [code, setCode] = useState('')
+  const [codeArr, setCodeArr] = useState<string[]>(['', '', '', ''])
+  const [focusIndex, setFocusIndex] = useState(0)
   const [countdown, setCountdown] = useState(60)
   const [loading, setLoading] = useState(false)
-  const timerRef = useRef<NodeJS.Timeout>(undefined)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([null, null, null, null])
+
+  // 响应式：判断是否为移动端
+  const isMobile = useSyncExternalStore(deviceStore.subscribe, deviceStore.getSnapshot, deviceStore.getSnapshot)
 
   const canSubmit = isValidPhone(phone) && agreed
 
@@ -41,61 +48,66 @@ export default function LoginModal({open, onClose}: IProps) {
     }
   }, [step, countdown])
 
-  // 进入验证码步骤时自动聚焦
+  // 进入验证码步骤时自动聚焦第一个输入框
   useEffect(() => {
     if (step === 'code') {
-      setTimeout(() => inputRef.current?.focus(), 100)
+      setTimeout(() => {
+        setFocusIndex(0)
+        inputRefs.current[0]?.focus()
+      }, 100)
     }
   }, [step])
 
   // 获取验证码
   const fetchCode = async () => {
-    try {
-      setLoading(true)
-      const response = await fetch('/api/auth/getCode', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({phone}),
-      })
-      const result = await response.json()
-      if (result.code === 200) {
-        successMessage(result.msg || '验证码发送成功')
-        return true
-      } else {
-        errorMessage(result.msg || '验证码发送失败')
-        return false
-      }
-    } catch (e) {
-      errorMessage('网络错误')
-      return false
-    } finally {
-      setLoading(false)
+    setLoading(true)
+    const result = await baseFetch({
+      url: 'auth/getCode',
+      method: 'post',
+      data: {phone},
+    })
+    setLoading(false)
+    if (result.isOk) {
+      successMessage(result.responseData?.msg || '验证码发送成功')
+      return true
     }
+    return false
+  }
+
+  // 绑定会话到用户
+  const bindConversationToUser = async () => {
+    // 从 URL 提取 conversationId（格式：/next/chat/xxx）
+    const pathMatch = window.location.pathname.match(/\/next\/chat\/([^/]+)/)
+    if (!pathMatch?.[1]) return
+
+    const conversationId = pathMatch[1]
+    await baseFetch({
+      url: 'ai/conversationIdToUser',
+      method: 'post',
+      data: {conversationId},
+      showErrorMessage: false,
+    })
+    historyStore.fetch()
   }
 
   // 登录
   const login = async (loginCode: string) => {
     if (!isValidCode(loginCode)) return
 
-    try {
-      setLoading(true)
-      const response = await fetch('/api/loginByPhone', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({phone, code: loginCode}),
-      })
-      const result = await response.json()
-      if (result.code === 200) {
-        successMessage(result.msg || '登录成功')
-        await userStore.fetch()
-        handleClose()
-      } else {
-        errorMessage(result.msg || '登录失败')
-      }
-    } catch (e) {
-      errorMessage('网络错误')
-    } finally {
-      setLoading(false)
+    setLoading(true)
+    const result = await baseFetch({
+      url: 'loginByPhone',
+      method: 'post',
+      data: {phone, code: loginCode},
+    })
+    setLoading(false)
+
+    if (result.isOk) {
+      successMessage(result.responseData?.msg || '登录成功')
+      await userStore.fetch()
+      // 登录成功后尝试绑定当前会话
+      await bindConversationToUser()
+      handleClose()
     }
   }
 
@@ -110,7 +122,8 @@ export default function LoginModal({open, onClose}: IProps) {
 
   const handleBack = () => {
     setStep('phone')
-    setCode('')
+    setCodeArr(['', '', '', ''])
+    setFocusIndex(0)
   }
 
   const handleResend = async () => {
@@ -121,18 +134,59 @@ export default function LoginModal({open, onClose}: IProps) {
     }
   }
 
-  const handleCodeChange = (value: string) => {
-    const newCode = value.replace(/\D/g, '').slice(0, 4)
-    setCode(newCode)
-    // 输入完成 4 位自动提交
-    if (newCode.length === 4) {
-      login(newCode)
+  // 处理单个验证码输入框的变化
+  const handleSingleCodeChange = (index: number, value: string) => {
+    const digit = value.replace(/\D/g, '').slice(-1) // 只取最后一个数字
+    const newCodeArr = [...codeArr]
+    newCodeArr[index] = digit
+    setCodeArr(newCodeArr)
+
+    // 如果输入了数字，跳转到下一个框
+    if (digit && index < 3) {
+      setFocusIndex(index + 1)
+      inputRefs.current[index + 1]?.focus()
     }
+
+    // 检查是否完成 4 位输入
+    const fullCode = newCodeArr.join('')
+    if (fullCode.length === 4 && isValidCode(fullCode)) {
+      login(fullCode)
+    }
+  }
+
+  // 处理键盘事件
+  const handleCodeKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      if (!codeArr[index] && index > 0) {
+        // 当前框为空时，删除上一个框的内容并聚焦
+        const newCodeArr = [...codeArr]
+        newCodeArr[index - 1] = ''
+        setCodeArr(newCodeArr)
+        setFocusIndex(index - 1)
+        inputRefs.current[index - 1]?.focus()
+        e.preventDefault()
+      }
+    } else if (e.key === 'ArrowLeft' && index > 0) {
+      setFocusIndex(index - 1)
+      inputRefs.current[index - 1]?.focus()
+      e.preventDefault()
+    } else if (e.key === 'ArrowRight' && index < 3) {
+      setFocusIndex(index + 1)
+      inputRefs.current[index + 1]?.focus()
+      e.preventDefault()
+    }
+  }
+
+  // 点击验证码框聚焦
+  const handleCodeBoxClick = (index: number) => {
+    setFocusIndex(index)
+    inputRefs.current[index]?.focus()
   }
 
   const handleClose = () => {
     setStep('phone')
-    setCode('')
+    setCodeArr(['', '', '', ''])
+    setFocusIndex(0)
     setCountdown(60)
     onClose()
   }
@@ -142,9 +196,11 @@ export default function LoginModal({open, onClose}: IProps) {
       open={open}
       onCancel={handleClose}
       footer={null}
-      width={400}
+      width={isMobile ? 300 : 400}
       centered
       destroyOnHidden
+      transitionName={isMobile ? '' : undefined}
+      maskTransitionName={isMobile ? '' : undefined}
     >
       {/* 手机号输入步骤 */}
       {step === 'phone' && (
@@ -208,32 +264,30 @@ export default function LoginModal({open, onClose}: IProps) {
           <p className="text-gray-500 mb-6">验证码已发送至 +86 {phone}</p>
 
           {/* 验证码输入框 */}
-          <div
-            className="w-full flex justify-center gap-2 mb-4 cursor-text"
-            onClick={() => inputRef.current?.focus()}
-          >
+          <div className="w-full flex justify-center gap-2 mb-4">
             {[0, 1, 2, 3].map(index => (
               <div
                 key={index}
                 className={`
-                  w-12 h-14 border rounded flex items-center justify-center text-2xl font-medium
-                  ${index === code.length ? 'border-blue-500' : 'border-gray-300'}
+                  w-12 h-14 border rounded flex items-center justify-center text-2xl font-medium cursor-text
+                  ${focusIndex === index ? 'border-blue-500' : 'border-gray-300'}
                 `}
+                onClick={() => handleCodeBoxClick(index)}
               >
-                {code[index] || ''}
+                <input
+                  ref={el => { inputRefs.current[index] = el }}
+                  type="text"
+                  inputMode="numeric"
+                  value={codeArr[index]}
+                  onChange={e => handleSingleCodeChange(index, e.target.value)}
+                  onKeyDown={e => handleCodeKeyDown(index, e)}
+                  onFocus={() => setFocusIndex(index)}
+                  className="w-full h-full text-center text-2xl font-medium outline-none bg-transparent"
+                  maxLength={1}
+                />
               </div>
             ))}
           </div>
-
-          {/* 隐藏的输入框 */}
-          <input
-            ref={inputRef}
-            type="text"
-            inputMode="numeric"
-            value={code}
-            onChange={e => handleCodeChange(e.target.value)}
-            className="opacity-0 h-0 w-0 absolute"
-          />
 
           {/* 重新发送 */}
           <p className="text-sm text-gray-500">
