@@ -14,7 +14,7 @@ import ChatDrawer from '@/components/ChatDrawer'
 import CopyButton from '@/components/CopyButton'
 import {useAsyncEffect} from '@/util/hooks/useEffectUtil'
 import {useResetState} from '@/util/hooks/useResetState'
-import {baseFetch} from '@/util/api'
+import {baseFetch, streamFetch} from '@/util/api.ts'
 
 interface IChat {
   question: string;
@@ -231,69 +231,38 @@ export default function Page(props: IProps) {
     setIsFetching(true)
     fetchQuestionAbortController.current = new AbortController()
 
-    try {
-      const api = '/api/ai/chat'
-      const response = await fetch(api, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          conversationId: conversationIdRef.current,
-          question: chatList.at(-1)?.question,
-        }),
-        signal: fetchQuestionAbortController.current.signal,
-      })
-
-      if (!response.ok || !response.body) throw new Error('请求失败')
-
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder('utf-8')
-      let buffer = ''
-
-      // 循环读取流式数据
-      while (true) {
-        const {done, value} = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, {stream: true})
-        const messages = buffer.split('\n\n')
-        buffer = messages.pop() || ''
-
-        for (const msg of messages) {
-          if (!msg) continue
-          if (msg === 'data: [DONE]') {
-            closeSSEConnection()
-            return
-          }
-          const dataStr = msg.replace(/^data: /, '')
-          const streamData: IStreamData = JSON.parse(dataStr)
-          // 后端返回新的 conversationId，更新 URL 和 ref
-          if (streamData.code === 200 && streamData.data.conversationId && streamData.data.conversationId !== conversationIdRef.current) {
-            conversationIdRef.current = streamData.data.conversationId
-            // 仅更新 URL 供用户复制，不触发导航
-            window.history.replaceState(null, '', `/next/chat/${streamData.data.conversationId}`)
-            // 用户已登录时，刷新历史会话列表
-            if (userStore.getSnapshot().userInfo) {
-              historyStore.fetch()
-            }
-          }
-          if (streamData.code === 200 && streamData.data.partialAnswer?.trim()) {
-            setChatList(prevState => [
-              ...prevState.slice(0, prevState.length - 1),
-              {
-                ...prevState.at(-1)!,
-                streamingAnswer: (prevState.at(-1)?.streamingAnswer || '') + streamData.data.partialAnswer,
-              },
-            ])
+    const result = await streamFetch<IStreamData>({
+      url: '/api/ai/chat',
+      data: {
+        conversationId: conversationIdRef.current,
+        question: chatList.at(-1)?.question,
+      },
+      signal: fetchQuestionAbortController.current.signal,
+      onMessage: (streamData) => {
+        // 后端返回新的 conversationId，更新 URL 和 ref
+        if (streamData.code === 200 && streamData.data.conversationId && streamData.data.conversationId !== conversationIdRef.current) {
+          conversationIdRef.current = streamData.data.conversationId
+          // 仅更新 URL 供用户复制，不触发导航
+          window.history.replaceState(null, '', `/next/chat/${streamData.data.conversationId}`)
+          // 用户已登录时，刷新历史会话列表
+          if (userStore.getSnapshot().userInfo) {
+            historyStore.fetch()
           }
         }
-      }
-    } catch (e) {
-      if ((e as Error).name === 'AbortError') {
-        console.log('手动停止的错误')
-        return
-      }
+        if (streamData.code === 200 && streamData.data.partialAnswer?.trim()) {
+          setChatList(prevState => [
+            ...prevState.slice(0, prevState.length - 1),
+            {
+              ...prevState.at(-1)!,
+              streamingAnswer: (prevState.at(-1)?.streamingAnswer || '') + streamData.data.partialAnswer,
+            },
+          ])
+        }
+      },
+    })
 
-      console.error('POST 流式请求失败：', (e as Error).name)
+    if (!result.isOk && result.reason !== 'AbortError') {
+      console.error('POST 流式请求失败：', result.reason)
       setChatList(prevState => [
         ...prevState.slice(0, prevState.length - 1),
         {
@@ -301,9 +270,9 @@ export default function Page(props: IProps) {
           streamingAnswer: '请求异常，请稍后重试',
         },
       ])
-
-      closeSSEConnection()
     }
+
+    closeSSEConnection()
   }
 
   // 停止请求
