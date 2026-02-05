@@ -1,16 +1,16 @@
 'use client'
 
-import {Drawer, Dropdown, Modal, Input, Button} from 'antd'
-import type {MenuProps} from 'antd'
-import {useSyncExternalStore, useState, useEffect} from 'react'
-import {userStore} from '@/store/user'
-import {historyStore, type IHistory} from '@/store/history'
-import {deviceStore} from '@/store/device'
+import {useEffect, useState, useSyncExternalStore} from 'react'
 import {useRouter} from 'next/navigation'
-import EllipsisHorSvg from '@/app/chat/icon/ellipsis-hor'
-import Write from '@/app/chat/icon/write'
-import {errorMessage, successMessage} from '@/util/message'
-import {baseFetch} from '@/util/api'
+import {Button, Drawer, Dropdown, Input, Modal} from 'antd'
+import type {MenuProps} from 'antd'
+import {userStore} from '@/store/user.ts'
+import {historyStore, type IHistory} from '@/store/history.ts'
+import {deviceStore} from '@/store/device.ts'
+import EllipsisHorSvg from '@/app/chat/icon/ellipsis-hor.tsx'
+import Write from '@/app/chat/icon/write.tsx'
+import {errorMessage, successMessage} from '@/util/message.ts'
+import {baseFetch} from '@/util/api.ts'
 
 interface IProps {
   open: boolean;
