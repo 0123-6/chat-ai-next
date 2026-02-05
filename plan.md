@@ -1,35 +1,12 @@
-联调下面2个接口
+# 待办
+// 请忽略 请修复以下bug,请注意网站同时支持pc端和移动端,自动测试代码是否有bug(仅限这次新增的),并自动修复
 
-# 手机号登录时获取验证码接口
-api /auth/getCode
-method: post
-request: {
-phone: '',
-}
-// 成功
-response: {
-code: 200,
-msg: '验证码发送成功',
-data: undefined,
-}
-// 失败
-response: {
-code: 999,
-msg: '请输入合法手机号',// 正常通过前端调用不会触发,因为前端已经校验,但要考虑兼容这种情况
-}
+主要可优化点
 
-# 通过手机号登录
-api: /loginByPhone
-method: post
-request: {
-phone: '',// 需要先校验为/^1[3-9]\d{9}$/.test(phone)
-code: '',//需要先校验为4位合法数字/^\d{4}$/,但实际是字符串类型
-}
-正常
-response: {
-code: 200,
-msg: '操作成功',
-data: {
-// 用户的信息,参见store/user.ts IUserInfo,并将信息保存在全局状态中
-},
-}
+1. 聊天主页面过于庞大（~577 行）
+chat/[[...conversationId]]/page.tsx 承担了太多职责：SSE 连接、滚动控制、Markdown 渲染、历史加载、
+UI渲染全部混在一起。可以考虑拆分：
+
+- SSE 流式请求逻辑 → useSSEChat hook
+- 滚动控制逻辑 → useAutoScroll hook
+- 单条消息渲染 → ChatMessage 组件
