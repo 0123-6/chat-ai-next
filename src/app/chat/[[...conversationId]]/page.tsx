@@ -1,38 +1,31 @@
-'use client';
+'use client'
 
 import '../index.css'
-import {useResetState} from "@/composables/useResetState";
-import hljs from "highlight.js";
-import { marked } from "marked";
-import {useEffect, useLayoutEffect, useRef, use, useSyncExternalStore, useState} from "react";
-import 'highlight.js/styles/default.css';
-import xss from "xss";
-import Logo from "../icon/logo";
-import EllipsisHorSvg from "@/app/chat/icon/ellipsis-hor";
-import Write from "@/app/chat/icon/write";
-import {useAsyncEffect} from "@/composables/useEffectUtil";
-import {userStore} from "@/store/user";
-import {errorMessage} from "@/util/message";
-import {Button} from "antd";
-import LoginModal from "@/components/LoginModal";
+import hljs from 'highlight.js'
+import {marked} from 'marked'
+import {useEffect, useLayoutEffect, useRef, use, useSyncExternalStore, useState} from 'react'
+import 'highlight.js/styles/default.css'
+import xss from 'xss'
+import {userStore} from '@/store/user'
+import {historyStore} from '@/store/history'
+import {Button} from 'antd'
+import LoginModal from '@/components/LoginModal'
+import ChatDrawer from '@/components/ChatDrawer'
+import CopyButton from '@/components/CopyButton'
+import {useAsyncEffect} from '@/util/hooks/useEffectUtil'
+import {useResetState} from '@/util/hooks/useResetState'
+import {baseFetch} from '@/util/api'
 
 interface IChat {
   question: string;
   // 流式分片拼接的临时存储，实现实时打字机效果
   streamingAnswer?: string;
 }
+
 interface IProps {
   params: Promise<{ conversationId?: string[] }>,
 }
-interface IResponseData {
-  // 正常情况下为200
-  code: number
-  // 描述信息
-  msg?: string
-  message?: string
-  // 真正的数据
-  data: Record<string, any>
-}
+
 // 流式数据结构（对应后端SSE推送格式）
 interface IStreamData {
   code: number;
@@ -42,38 +35,21 @@ interface IStreamData {
     partialAnswer?: string;
   };
 }
-// 历史会话响应结构
-interface IHistoryResponse {
-  code: number;
-  msg: string;
-  data: {
-    conversationId: string;
-    list: Array<{ question: string; answer: string }>;
-  };
-}
-
-const historyChatList = [
-  'Nuxt4引入SVG方式',
-  'Vue React UI库推荐',
-  '微前端2025现状分析',
-  '多个子网站运行方式多个子网站运行方式',
-  'Nuxt4引入SVG方式',
-]
-
 export default function Page(props: IProps) {
-  const [mounted, setMounted] = useState(false)
   const [loginModalOpen, setLoginModalOpen] = useState(false)
-  useEffect(() => { setMounted(true) }, [])
-  const userInfo = useSyncExternalStore(userStore.subscribe, userStore.getSnapshot, userStore.getSnapshot)
-  console.log('userInfo', userInfo)
-  const { conversationId: conversationIdArr } = use(props.params)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const {
+    userInfo,
+    initialized,
+  } = useSyncExternalStore(userStore.subscribe, userStore.getSnapshot, userStore.getSnapshot)
+  const {conversationId: conversationIdArr} = use(props.params)
   // 可选捕获路由：/chat -> undefined, /chat/xxx -> ['xxx']
   // 保存当前会话ID（可能由后端返回更新）
   const conversationIdRef = useRef<string | undefined>(conversationIdArr?.[0])
 
   const fullHelpContent = '有什么我能帮你的吗？'
-  const [helpContent, setHelpContent, resetHelpContent] = useResetState((): string => '')
-  const timer = useRef<NodeJS.Timeout>(undefined)
+  const [helpContent, setHelpContent, _resetHelpContent] = useResetState((): string => '')
+  const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const helpContentIndex = useRef(0)
   useEffect(() => {
     timer.current = setInterval(() => {
@@ -84,8 +60,9 @@ export default function Page(props: IProps) {
         timer.current = undefined
       }
     }, 40)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  
+
   const [question, setQuestion, resetQuestion] = useResetState(() => '')
   const clickSend = () => {
     // 没有内容,直接退出
@@ -100,39 +77,35 @@ export default function Page(props: IProps) {
     resetQuestion()
   }
   const connectRef = useRef<HTMLDivElement | null>(null)
-  const [isFetching, setIsFetching, resetIsFetching] = useResetState((): boolean => false)
+  const [isFetching, setIsFetching, _resetIsFetching] = useResetState((): boolean => false)
   const [chatList, setChatList, resetChatList] = useResetState((): IChat[] => [])
+  // 自动滚动控制
+  const [autoScroll, setAutoScroll] = useState(true)
+  const [showScrollBtn, setShowScrollBtn] = useState(false)
+  // 当前激活的复制按钮（点击或悬浮时显示）: 'q-0' 表示第0个问题, 'a-0' 表示第0个回答
+  const [activeCopyIndex, setActiveCopyIndex] = useState<string | null>(null)
 
   const fetchHistory = async () => {
-    try {
-      const api = '/api/ai/getHistoryById'
-      const response = await fetch(api, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversationId: conversationIdRef.current }),
-      })
+    const result = await baseFetch({
+      url: 'ai/getHistoryById',
+      method: 'post',
+      data: {conversationId: conversationIdRef.current},
+    })
 
-      if (!response.ok) return
-
-      const result: IHistoryResponse = await response.json()
-      if (result.code === 200 && result.data.list?.length) {
-        // 将历史记录转换为 IChat 格式
-        setChatList(result.data.list.map(item => ({
-          question: item.question,
-          streamingAnswer: item.answer,
-        })))
-      } else if (result.code !== 200) {
-        errorMessage(result.msg)
-        // conversationId 无效（过期、已删除或非法），从 URL 中移除
-        conversationIdRef.current = undefined
-        window.history.replaceState(null, '', '/next/chat')
-      }
-    } catch (e) {
-      console.error('获取历史会话失败：', e)
+    if (result.isOk && result.responseData?.data.list?.length) {
+      // 将历史记录转换为 IChat 格式
+      setChatList(result.responseData.data.list.map((item: { question: string; answer: string }) => ({
+        question: item.question,
+        streamingAnswer: item.answer,
+      })))
+    } else if (!result.isOk) {
+      // conversationId 无效（过期、已删除或非法），从 URL 中移除
+      conversationIdRef.current = undefined
+      window.history.replaceState(null, '', '/next/chat')
     }
   }
 
-  // 页面加载时获取历史会话
+  // 页面首次加载时获取历史会话
   useAsyncEffect(() => {
     if (!conversationIdRef.current) return
     fetchHistory()
@@ -145,49 +118,115 @@ export default function Page(props: IProps) {
     [chatList.length],
     {
       immediate: false,
-    }
+    },
   )
-  useLayoutEffect(() => {
-    // dom未渲染
-    if (!connectRef.current) {
-      return
+  // 滚动到底部（可选平滑效果）
+  const scrollToBottom = (smooth = false) => {
+    if (!connectRef.current) return
+    if (smooth) {
+      connectRef.current.scrollTo({
+        top: connectRef.current.scrollHeight,
+        behavior: 'smooth',
+      })
+    } else {
+      connectRef.current.scrollTop = connectRef.current.scrollHeight
+    }
+  }
+
+  // 用户滚动事件监听
+  useEffect(() => {
+    const container = connectRef.current
+    if (!container) return
+
+    let lastScrollTop = container.scrollTop
+    const handleScroll = () => {
+      const {scrollTop, scrollHeight, clientHeight} = container
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50
+      const currentScrollTop = scrollTop
+
+      // 用户向上滚动时，停止自动滚动
+      if (currentScrollTop < lastScrollTop) {
+        setAutoScroll(false)
+      }
+
+      // 用户手动滚动到底部时，重新激活自动滚动
+      if (isAtBottom && isFetching) {
+        setAutoScroll(true)
+      }
+
+      // 根据是否在底部显示/隐藏按钮
+      setShowScrollBtn(!isAtBottom)
+
+      lastScrollTop = currentScrollTop
     }
 
-    // 计算是否处于底部（10px 容差，避免微小滚动偏差）
-    // if (Math.abs(connectRef.current.scrollHeight - connectRef.current.clientHeight) >= 10) {
-    //   return
-    // }
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+     
+  }, [isFetching])
 
-    connectRef.current.scrollTop = connectRef.current.scrollHeight
-  }, [chatList]);
+  // 自动滚动到底部
+  useLayoutEffect(() => {
+    if (!connectRef.current || !autoScroll) return
+    scrollToBottom()
+  }, [chatList, autoScroll])
+
+  // 回答完成后滚动到底部（让用户看到复制图标）
+  useEffect(() => {
+    if (!isFetching && autoScroll && chatList.length > 0) {
+      // 延迟一下等待 DOM 更新
+      setTimeout(() => scrollToBottom(), 50)
+    }
+  }, [isFetching, autoScroll, chatList.length])
+
+  // 点击滚动到底部按钮
+  const handleScrollToBottom = () => {
+    scrollToBottom(true) // 平滑滚动
+    // 如果正在输出，恢复自动滚动
+    if (isFetching) {
+      setAutoScroll(true)
+    }
+    setShowScrollBtn(false)
+  }
+
+  // 发送新消息时重置自动滚动
+  useEffect(() => {
+    if (chatList.length > 0) {
+      setAutoScroll(true)
+    }
+  }, [chatList.length])
   const fetchQuestionAbortController = useRef<AbortController>(undefined)
   // 关闭SSE连接（统一管理，避免内存泄漏）
   const closeSSEConnection = () => {
     setIsFetching(false)
     fetchQuestionAbortController.current?.abort?.()
-  };
-
-  const clickHint = (newQuestion: string) => {
-    setChatList(prevState => [...prevState, {
-      question: newQuestion,
-      streamingAnswer: '', // 初始化流式回答
-    }])
   }
+
   const clickNewChat = () => {
-    closeSSEConnection();
-    resetChatList();
+    closeSSEConnection()
+    resetChatList()
     // 重置会话ID并更新URL（仅更新URL，不触发导航）
     conversationIdRef.current = undefined
-    window.history.replaceState(null, '', '/next/chat')
+    window.history.pushState(null, '', '/next/chat')
+  }
+
+  // 选择历史会话
+  const handleSelectHistory = async (conversationId: string) => {
+    closeSSEConnection()
+    resetChatList()
+    // 更新会话ID和URL
+    conversationIdRef.current = conversationId
+    window.history.pushState(null, '', `/next/chat/${conversationId}`)
+    // 获取历史数据
+    await fetchHistory()
   }
   const fetchQuestionWithSSE = async () => {
-    console.log(chatList)
-    if (!chatList.length) return;
-    if (!chatList.at(-1)!.question) return;
+    if (!chatList.length) return
+    if (!chatList.at(-1)!.question) return
     // 查询id获取的,不是用户触发的
-    if (chatList.at(-1)!.streamingAnswer) return;
+    if (chatList.at(-1)!.streamingAnswer) return
 
-    closeSSEConnection();
+    closeSSEConnection()
 
     setIsFetching(true)
     fetchQuestionAbortController.current = new AbortController()
@@ -196,42 +235,46 @@ export default function Page(props: IProps) {
       const api = '/api/ai/chat'
       const response = await fetch(api, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           conversationId: conversationIdRef.current,
           question: chatList.at(-1)?.question,
         }),
         signal: fetchQuestionAbortController.current.signal,
-      });
+      })
 
-      if (!response.ok || !response.body) throw new Error('请求失败');
+      if (!response.ok || !response.body) throw new Error('请求失败')
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let buffer = '';
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder('utf-8')
+      let buffer = ''
 
       // 循环读取流式数据
       while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        const {done, value} = await reader.read()
+        if (done) break
 
-        buffer += decoder.decode(value, { stream: true });
-        const messages = buffer.split('\n\n');
-        buffer = messages.pop() || '';
+        buffer += decoder.decode(value, {stream: true})
+        const messages = buffer.split('\n\n')
+        buffer = messages.pop() || ''
 
         for (const msg of messages) {
-          if (!msg) continue;
+          if (!msg) continue
           if (msg === 'data: [DONE]') {
-            closeSSEConnection();
-            return;
+            closeSSEConnection()
+            return
           }
-          const dataStr = msg.replace(/^data: /, '');
-          const streamData: IStreamData = JSON.parse(dataStr);
+          const dataStr = msg.replace(/^data: /, '')
+          const streamData: IStreamData = JSON.parse(dataStr)
           // 后端返回新的 conversationId，更新 URL 和 ref
           if (streamData.code === 200 && streamData.data.conversationId && streamData.data.conversationId !== conversationIdRef.current) {
             conversationIdRef.current = streamData.data.conversationId
             // 仅更新 URL 供用户复制，不触发导航
             window.history.replaceState(null, '', `/next/chat/${streamData.data.conversationId}`)
+            // 用户已登录时，刷新历史会话列表
+            if (userStore.getSnapshot().userInfo) {
+              historyStore.fetch()
+            }
           }
           if (streamData.code === 200 && streamData.data.partialAnswer?.trim()) {
             setChatList(prevState => [
@@ -250,7 +293,7 @@ export default function Page(props: IProps) {
         return
       }
 
-      console.error('POST 流式请求失败：', (e as Error).name);
+      console.error('POST 流式请求失败：', (e as Error).name)
       setChatList(prevState => [
         ...prevState.slice(0, prevState.length - 1),
         {
@@ -259,14 +302,14 @@ export default function Page(props: IProps) {
         },
       ])
 
-      closeSSEConnection();
+      closeSSEConnection()
     }
-  };
+  }
 
   // 停止请求
   const clickStopFetch = () => {
-    closeSSEConnection();
-  };
+    closeSSEConnection()
+  }
   useEffect(() => {
     // 配置 marked：启用代码高亮
     marked.setOptions({
@@ -276,154 +319,165 @@ export default function Page(props: IProps) {
         // 如果指定了语言，且 highlight.js 支持该语言，则高亮
         if (lang && hljs.getLanguage(lang)) {
           try {
-            return hljs.highlight(code, { language: lang }).value;
+            return hljs.highlight(code, {language: lang}).value
           } catch (err) {
-            console.error('代码高亮失败：', err);
+            console.error('代码高亮失败：', err)
           }
         }
         // 不支持的语言，默认高亮
-        return hljs.highlightAuto(code).value;
+        return hljs.highlightAuto(code).value
       },
       breaks: true, // 自动将 \n 转为 <br>
       gfm: true, // 支持 GitHub Flavored Markdown
-    });
+    })
   }, [])
   // 辅助函数：将 Markdown 字符串转为 HTML
   // 优化 renderMarkdown 函数，增加 XSS 过滤
   const renderMarkdown = (content: string | undefined): string => {
-    if (!content) return '';
+    if (!content) return ''
     // 先解析 Markdown，再过滤危险 HTML 标签/属性
-    const htmlContent = marked.parse(content) as string;
-    return xss(htmlContent); // 防止 XSS 攻击
-  };
+    const htmlContent = marked.parse(content) as string
+    return xss(htmlContent) // 防止 XSS 攻击
+  }
 
   const textareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     // 1. 区分 Shift+Enter（换行） 和 纯Enter（发送）
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault(); // 阻止纯Enter的默认换行行为
-      clickSend(); // 触发发送消息逻辑
+      e.preventDefault() // 阻止纯Enter的默认换行行为
+      clickSend() // 触发发送消息逻辑
     }
     // 当按住Shift+Enter时，不做特殊处理，保留默认换行行为
-  };
+  }
 
   return (
-    <div className={'w-full h-full flex flex-col'}>
+    <div className={'w-full h-full flex flex-col overflow-auto'}>
       {/*头部*/}
-      <div className={'w-full px-6 h-12 flex justify-end items-center'}>
-        {
-          mounted && !userInfo && (
-            <Button
-              type={'primary'}
-              onClick={() => setLoginModalOpen(true)}
-            >登录</Button>
-          )
-        }
-        {
-          mounted && userInfo && (
-            <div>已经登录</div>
-          )
-        }
+      <div className={'w-full px-4 h-12 flex justify-between items-center'}>
+        {/* 左侧按钮组 */}
+        <div className="flex items-center gap-2">
+          {/* 汉堡菜单按钮 */}
+          <button
+            className="w-9 h-9 flex justify-center items-center hover:bg-[#00000012] rounded-xl"
+            onClick={() => setDrawerOpen(true)}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5"
+                 stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/>
+            </svg>
+          </button>
+          {/* 新对话按钮 */}
+          <button
+            className="h-9 px-2 flex items-center gap-1 hover:bg-[#00000012] rounded-xl"
+            onClick={clickNewChat}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5"
+                 stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round"
+                    d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"/>
+            </svg>
+            <span className="text-sm">新对话</span>
+          </button>
+        </div>
+        {/* 右侧登录按钮 */}
+        {initialized && !userInfo && (
+          <Button
+            type={'primary'}
+            size="large"
+            style={{minWidth: 64, height: 40, color: 'white'}}
+            onClick={() => setLoginModalOpen(true)}
+          >登录</Button>
+        )}
       </div>
       <div
-        className={'w-full flex'}
-        style={{
-          height: 'calc(100% - 48px)',
-        }}
+        className={'w-full flex h-[calc(100%-48px)]'}
       >
-        {/* 左侧 */}
-        <div className={'hidden w-65 h-full flex-col overflow-auto bg-[#f9f9f9] border-r border-[#ededed]'}>
-          <div className={'w-full px-2 flex flex-col gap-y-2'}>
-            {/* 头部 */}
-            <div className="h-13 flex justify-between items-center">
-              {/*左侧logo*/}
-              <button className="w-9 h-9 flex justify-center items-center hover:bg-[#00000012] rounded-xl">
-                <div className={'w-6 h-6'}>
-                  <Logo/>
-                </div>
-              </button>
-            </div>
-            {/* 按钮区 */}
-            <div
-              className={'px-3 h-9 flex items-center gap-x-2 hover:bg-[#00000012] rounded-xl'}
-              onClick={clickNewChat}
-            >
-              <div className={'w-5 h-5'}>
-                <Write/>
-              </div>
-              <span>新聊天</span>
-            </div>
-            <span className="text-[#8f8f8f]">你的聊天</span>
-            {
-              historyChatList.map((item, index) => (
-                <div
-                  key={index}
-                  className={'px-2 h-9 flex items-center hover:bg-[#00000012] rounded-xl group relative'}
-                >
-                  <span className="w-full group-hover:w-48 text-sm line-clamp-1">{item}</span>
-                  <div className="absolute right-2 hidden group-hover:flex">
-                    <div className={'w-5 h-5 cursor-pointer'}>
-                      <EllipsisHorSvg/>
-                    </div>
-                  </div>
-                </div>
-              ))
-            }
-          </div>
-        </div>
-        {/* 右侧 */}
         <div className={'grow h-full py-5 flex flex-col justify-center items-center gap-y-6'}>
           {/* 内容区 */}
           <div ref={connectRef}
-               className={`
-             w-4/5 max-w-200 flex flex-col overflow-auto
-             ${chatList.length ? 'grow' : ''}
-             `}
-          >
+               className={`w-4/5 max-w-200 relative flex flex-col overflow-auto ${chatList.length ? 'grow' : ''}`}>
             {
               !chatList.length && (
-                <div className="w-full h-full flex flex-col justify-center items-center gap-y-2">
+                <div className="w-full flex flex-col justify-center items-center gap-y-2">
                   <span className="mb-5 h-9 text-black font-bold text-2xl">{helpContent}</span>
-                  {/*<HintList click={clickHint}/>*/}
                 </div>
               )
             }
             {
               !!chatList.length && (
-                <div className={'w-full h-full flex flex-col gap-y-13'}>
+                <div className={'w-full flex flex-col gap-y-13'}>
                   {
-                    chatList.map((item, index) => (
-                      <div
-                        key={index}
-                        className={'flex flex-col gap-y-13'}
-                      >
-                        {/* 问题 */}
-                        <div className={'flex justify-end items-center relative'}>
-                          <div className={'max-w-112.5 bg-[#f5f5f5] px-4 py-2.5 rounded-xl'}>
-                            <span className="w-full break-all">{item.question}</span>
+                    chatList.map((item, index) => {
+                      const isLastItem = index === chatList.length - 1
+                      const isAnswerComplete = !isFetching || !isLastItem
+                      const showQuestionCopy = activeCopyIndex === `q-${index}`
+                      const showAnswerCopy = isAnswerComplete && (activeCopyIndex === `a-${index}` || isLastItem)
+
+                      return (
+                        <div
+                          key={index}
+                          className={'flex flex-col gap-y-13'}
+                        >
+                          {/* 问题 */}
+                          <div
+                            className={'flex flex-col items-end group'}
+                            onMouseEnter={() => setActiveCopyIndex(`q-${index}`)}
+                            onMouseLeave={() => setActiveCopyIndex(null)}
+                            onClick={() => setActiveCopyIndex(activeCopyIndex === `q-${index}` ? null : `q-${index}`)}
+                          >
+                            <div className={'relative max-w-112.5 bg-[#f5f5f5] px-4 py-2.5 rounded-xl'}>
+                              <span className="w-full break-all">{item.question}</span>
+                              {/* 复制按钮 */}
+                              {showQuestionCopy && (
+                                <CopyButton text={item.question} className="absolute right-0 -bottom-6" />
+                              )}
+                            </div>
+                          </div>
+                          {/* 回答 */}
+                          <div
+                            className={'relative group'}
+                            onMouseEnter={() => setActiveCopyIndex(`a-${index}`)}
+                            onMouseLeave={() => !isLastItem && setActiveCopyIndex(null)}
+                            onClick={() => setActiveCopyIndex(activeCopyIndex === `a-${index}` ? null : `a-${index}`)}
+                          >
+                            <div
+                              className={'ai-answer-markdown'}
+                              dangerouslySetInnerHTML={{__html: renderMarkdown(item.streamingAnswer)}}
+                            />
+                            {/* 复制按钮 */}
+                            {showAnswerCopy && item.streamingAnswer && (
+                              <CopyButton text={item.streamingAnswer} className="absolute left-0 -bottom-6" />
+                            )}
                           </div>
                         </div>
-                        {/* 回答 */}
-                        <div
-                          className={'ai-answer-markdown'}
-                          dangerouslySetInnerHTML={{ __html: renderMarkdown(item.streamingAnswer) }}
-                        />
-                      </div>
-                    ))
+                      )
+                    })
                   }
                 </div>
               )
             }
           </div>
           {/* 用户交互区 */}
-          <div className={'w-4/5 max-w-200 rounded-2xl border border-[#e0e0e0] flex flex-col p-3'}>
-          <textarea
-            value={question}
-            onChange={e => setQuestion(e.target.value)}
-            placeholder="询问任何问题"
-            rows={4}
-            className="box-border min-h-14 max-h-40 resize-none"
-            onKeyDown={textareaKeyDown}
-          ></textarea>
+          <div className={'relative w-4/5 max-w-200 rounded-2xl border border-[#e0e0e0] flex flex-col p-3'}>
+            {/* 滚动到底部按钮 */}
+            {(showScrollBtn) && (
+              <button
+                className="absolute -top-20 left-1/2 -translate-x-1/2 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-10"
+                onClick={handleScrollToBottom}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2}
+                     stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3"/>
+                </svg>
+              </button>
+            )}
+            <textarea
+              value={question}
+              onChange={e => setQuestion(e.target.value)}
+              placeholder="询问任何问题"
+              rows={4}
+              className="box-border min-h-14 max-h-40 resize-none"
+              onKeyDown={textareaKeyDown}
+            ></textarea>
             {/*@keydown.enter.prevent="clickSend"*/}
             <div className={'flex justify-end items-center'}>
               {/* 发送按钮 */}
@@ -474,7 +528,19 @@ export default function Page(props: IProps) {
         </div>
       </div>
       {/* 登录弹窗 */}
-      <LoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)} />
+      <LoginModal open={loginModalOpen} onClose={() => setLoginModalOpen(false)}/>
+      {/* 左侧抽屉 */}
+      <ChatDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        currentConversationId={conversationIdRef.current}
+        onLogout={() => {
+          resetChatList()
+          conversationIdRef.current = undefined
+        }}
+        onSelectHistory={handleSelectHistory}
+        onNewChat={clickNewChat}
+      />
     </div>
   )
 }
