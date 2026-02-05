@@ -214,7 +214,6 @@ export async function baseFetch(props: IBaseFetch)
   }
   let body: string | Blob | FormData = undefined
   const isFetchProd = process.env.NODE_ENV !== 'development' || mockProd
-  console.log(isFetchProd)
   if (!url) {
     errorMessage('url不可以为\'\',请设置初始值为\'mock_\'')
     return {
