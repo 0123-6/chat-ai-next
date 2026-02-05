@@ -1,19 +1,19 @@
 'use client'
 
 import '../index.css'
+import 'highlight.js/styles/default.css'
 import hljs from 'highlight.js'
 import {marked} from 'marked'
-import {useEffect, useRef, use, useSyncExternalStore, useState} from 'react'
-import 'highlight.js/styles/default.css'
+import {use, useEffect, useRef, useState, useSyncExternalStore} from 'react'
 import xss from 'xss'
-import {userStore} from '@/store/user'
-import {historyStore} from '@/store/history'
 import {Button} from 'antd'
-import LoginModal from '@/components/LoginModal'
-import ChatDrawer from '@/components/ChatDrawer'
+import {userStore} from '@/store/user.ts'
+import {historyStore} from '@/store/history.ts'
+import LoginModal from '@/components/LoginModal.tsx'
+import ChatDrawer from '@/components/ChatDrawer.tsx'
 import ChatMessage from '@/components/ChatMessage.tsx'
-import {useAsyncEffect} from '@/util/hooks/useEffectUtil'
-import {useResetState} from '@/util/hooks/useResetState'
+import {useAsyncEffect} from '@/util/hooks/useEffectUtil.ts'
+import {useResetState} from '@/util/hooks/useResetState.ts'
 import {useScrollControl} from '@/util/hooks/useScrollControl.ts'
 import {baseFetch, streamFetch} from '@/util/api.ts'
 
@@ -84,7 +84,6 @@ export default function Page(props: IProps) {
   // 滚动控制
   const {
     containerRef,
-    autoScroll: _autoScroll,
     setAutoScroll,
     showScrollBtn,
     handleScrollToBottom,

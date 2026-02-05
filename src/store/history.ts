@@ -1,6 +1,6 @@
-import type {IUseSyncExternalStoreProps} from '@/util/hooks/IUseSyncExternalStoreProps'
-import {baseFetch} from '@/util/api'
-import {errorMessage, successMessage} from '@/util/message'
+import type {IUseSyncExternalStoreProps} from '@/util/hooks/IUseSyncExternalStoreProps.ts'
+import {baseFetch} from '@/util/api.ts'
+import {errorMessage, successMessage} from '@/util/message.ts'
 
 // 历史会话类型
 export interface IHistory {

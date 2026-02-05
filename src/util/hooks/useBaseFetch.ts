@@ -1,5 +1,5 @@
-import {baseFetch, type IBaseFetch, type IBaseFetchReturn, type IResponseData} from '@/util/api'
 import {type RefObject, useEffect, useRef} from 'react'
+import {baseFetch, type IBaseFetch, type IBaseFetchReturn, type IResponseData} from '@/util/api.ts'
 import {useResetState} from '@/util/hooks/useResetState.ts'
 
 export interface IUseBaseFetch {

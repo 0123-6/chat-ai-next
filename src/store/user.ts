@@ -1,4 +1,4 @@
-import type {IUseSyncExternalStoreProps} from '@/util/hooks/IUseSyncExternalStoreProps'
+import type {IUseSyncExternalStoreProps} from '@/util/hooks/IUseSyncExternalStoreProps.ts'
 import {baseFetch} from '@/util/api.ts'
 
 // 用户信息类型
@@ -19,6 +19,7 @@ interface IUserStore {
 
 type IProps = IUseSyncExternalStoreProps<IUserStore> & {
   fetch: () => Promise<void>,
+  set: (value: IUserStore | null) => void,
 }
 
 let storeObject: IUserStore = {
@@ -30,21 +31,23 @@ const subSet = new Set<() => void>()
 export const userStore: IProps = {
   subscribe: sub => {
     subSet.add(sub)
-
     return () => {
       subSet.delete(sub)
     }
   },
   getSnapshot: () => storeObject,
-  set: (newUserStore: IUserStore) => {
-    if (!newUserStore) {
-      return
-    }
-    
-    // 更新缓存快照
-    storeObject = {
-      userInfo: newUserStore.userInfo,
-      initialized: newUserStore.initialized,
+  set: (newUserStore: IUserStore | null) => {
+    // 支持传入 null 来清除用户信息（退出登录场景）
+    if (newUserStore === null) {
+      storeObject = {
+        userInfo: null,
+        initialized: true,
+      }
+    } else {
+      storeObject = {
+        userInfo: newUserStore.userInfo,
+        initialized: newUserStore.initialized,
+      }
     }
     for (const sub of subSet) {
       sub()

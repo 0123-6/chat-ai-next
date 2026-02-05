@@ -1,12 +1,12 @@
 'use client'
 
-import {Modal, Input, Button, Checkbox, Space} from 'antd'
-import {useState, useEffect, useRef, useSyncExternalStore} from 'react'
-import {userStore} from '@/store/user'
-import {successMessage} from '@/util/message'
-import {historyStore} from '@/store/history'
-import {deviceStore} from '@/store/device'
-import {baseFetch} from '@/util/api'
+import {useEffect, useRef, useState, useSyncExternalStore} from 'react'
+import {Button, Checkbox, Input, Modal, Space} from 'antd'
+import {userStore} from '@/store/user.ts'
+import {historyStore} from '@/store/history.ts'
+import {deviceStore} from '@/store/device.ts'
+import {successMessage} from '@/util/message.ts'
+import {baseFetch} from '@/util/api.ts'
 
 interface IProps {
   open: boolean;
