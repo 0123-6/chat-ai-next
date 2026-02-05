@@ -21,8 +21,10 @@ type IProps = IUseSyncExternalStoreProps<IUserStore> & {
   fetch: () => Promise<void>,
 }
 
-let userInfo: IUserInfo | null = null
-let initialized = false
+let storeObject: IUserStore = {
+  userInfo: null,
+  initialized: false,
+}
 const subSet = new Set<() => void>()
 
 export const userStore: IProps = {
@@ -33,18 +35,17 @@ export const userStore: IProps = {
       subSet.delete(sub)
     }
   },
-  getSnapshot: () => ({
-    userInfo,
-    initialized,
-  }),
+  getSnapshot: () => storeObject,
   set: (newUserStore: IUserStore) => {
     if (!newUserStore) {
       return
     }
     
-    userInfo = newUserStore.userInfo
-    initialized = newUserStore.initialized
-    
+    // 更新缓存快照
+    storeObject = {
+      userInfo: newUserStore.userInfo,
+      initialized: newUserStore.initialized,
+    }
     for (const sub of subSet) {
       sub()
     }
