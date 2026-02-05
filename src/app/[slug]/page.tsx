@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import { useRouter } from "next/navigation";
+import { useRouter } from 'next/navigation'
 
- // 关键：放在文件最顶部，标记为客户端组件
+// 关键：放在文件最顶部，标记为客户端组件
 
 export default function Page() {
   const router = useRouter()
