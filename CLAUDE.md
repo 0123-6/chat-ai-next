@@ -5,6 +5,7 @@
 ## 项目概述
 
 基于 Next.js 的 AI 聊天应用（模仿豆包），使用 SSE（Server-Sent Events）实现实时流式响应。
+请注意,我的项目使用了babel-plugin-react-compiler功能,所以你应该不需要手动使用useMemo,memo,useCallback来优化代码
 
 ## 常用命令
 
@@ -38,8 +39,22 @@ src/
 │   └── [slug]/page.tsx  # 404 兜底路由
 ├── components/          # 可复用 UI 组件
 └── composables/         # 自定义 React Hooks（Vue 风格命名）
-    ├── useResetState.ts # 带重置功能的 useState
-    └── useEffectUtil.ts # 异步 useEffect
+--- util/ # 这是跨框架(Vue,react),跨项目通用的工具函数和能力,你应该尽可能的使用并优化这个文件夹的公共函数
+ 除非不使用更好,你应该将可抽离的公共能力放在这个文件夹中,hooks文件为react项目的hook,和react有关,
+ 非hooks的则为跨框架通用工具函数和能力
+ --- util/hooks react版本公共hook
+ --- util/hooks/IUseSyncExternalStoreProps.ts 用来定义公共状态,结合useSyncExternalStore使用
+ --- util/hooks/useBaseFetch.ts 函数式组件内部尽量使用这个来请求函数,除非你有明确的理由不使用它
+ --- util/hooks/useEffectUtil.ts 一个对useEffect简单的封装,让它可以支持异步函数和仅更新时执行
+ --- util/hooks/useResetState.ts useState的简单包装,添加了重置功能
+ --- util/api.ts 请求工具函数
+ --- util/date.ts 日期处理工具函数
+ --- util/env.ts 环境工具函数
+ --- util/file.ts 文件处理工具函数
+ --- util/message.ts 消息提示工具函数
+ --- util/object.ts 判断是否是纯对象工具函数
+ --- util/stringUtil.ts 字符串相关工具函数
+ --- util/validator.ts 校验工具函数
 ```
 
 ### 聊天界面 (`src/app/chat/page.tsx`)
