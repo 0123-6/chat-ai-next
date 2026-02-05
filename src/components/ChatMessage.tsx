@@ -1,6 +1,6 @@
 'use client'
 
-import CopyButton from '@/components/CopyButton'
+import CopyButton from '@/components/CopyButton.tsx'
 
 interface ChatMessageProps {
   /** 问题内容 */
