@@ -23,11 +23,9 @@ export function debounce<T extends (...args: any[]) => any>(fn: T, delay: number
   return function (this: any, ...args: Parameters<T>) {
     if (timer) {
       clearTimeout(timer)
-      timer = null
     }
     timer = setTimeout(() => {
       fn.apply(this, args)
-      clearTimeout(timer!)
       timer = null
     }, delay)
   }
@@ -41,7 +39,6 @@ export function throttle<T extends (...args: any[]) => any>(fn: T, delay: number
     if (!timer) {
       fn.apply(this, args)
       timer = setTimeout(() => {
-        clearTimeout(timer!)
         timer = null
       }, delay)
     }
