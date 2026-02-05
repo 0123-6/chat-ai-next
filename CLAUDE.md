@@ -85,3 +85,7 @@ interface IChat {
 - Tailwind 自定义设计令牌在 `globals.css`
 - 中文字体栈: PingFang SC、Hiragino Sans GB、Microsoft YaHei
 - Markdown 样式在 `src/app/chat/index.css`
+
+### 1. 导入规范
+- ✅ `import {xxx} from '@/util/api.ts'`
+- ❌ `import {xxx} from '@/util/api'`
