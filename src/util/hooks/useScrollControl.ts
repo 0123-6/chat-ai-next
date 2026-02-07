@@ -80,6 +80,17 @@ export function useScrollControl(
     return () => container.removeEventListener('scroll', handleScroll)
   }, [isFetching, threshold])
 
+  // 内容变化时，检查容器是否还需要滚动，不需要则隐藏按钮
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    if (container.scrollHeight <= container.clientHeight + threshold) {
+      setShowScrollBtn(false)
+      setAutoScroll(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [...deps])
+
   // 自动滚动到底部
   useLayoutEffect(() => {
     if (!containerRef.current || !autoScroll) return
