@@ -62,7 +62,7 @@ export default function ChatDrawer({open, onClose, currentConversationId, onLogo
     }
     Modal.confirm({
       title: '删除会话',
-      content: `确定要删除「${item.title}」吗？`,
+      content: `确定要删除 ${item.title} 吗？`,
       okText: '删除',
       okType: 'danger',
       cancelText: '取消',
