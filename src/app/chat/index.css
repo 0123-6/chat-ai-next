@@ -4,6 +4,7 @@
   color: #333;
   font-size: 15px;
   word-break: break-all;
+  overflow-x: auto;
 }
 
 /* Markdown 内部元素样式优化 */
@@ -118,4 +119,52 @@
 
 .ai-answer-markdown tr:nth-child(odd) {
   background-color: #fafbfc;
+}
+
+/* 表格可滚动容器（移动端横向滚动） */
+.ai-answer-markdown .table-wrapper {
+  overflow-x: auto;
+  margin: 16px 0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.ai-answer-markdown .table-wrapper table {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  width: max-content;
+  min-width: 100%;
+}
+
+/* 引用块 */
+.ai-answer-markdown blockquote {
+  border-left: 4px solid #dfe2e5;
+  padding: 8px 16px;
+  margin: 12px 0;
+  color: #6a737d;
+  background-color: #f8f9fa;
+  border-radius: 0 4px 4px 0;
+}
+
+/* 分割线 */
+.ai-answer-markdown hr {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 16px 0;
+}
+
+/* 链接 */
+.ai-answer-markdown a {
+  color: #0366d6;
+  text-decoration: none;
+}
+
+.ai-answer-markdown a:hover {
+  text-decoration: underline;
+}
+
+/* 列表项间距 */
+.ai-answer-markdown li {
+  margin: 4px 0;
 }
