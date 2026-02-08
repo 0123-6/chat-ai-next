@@ -47,7 +47,7 @@ export default function ChatMessage({
           <span className="w-full break-all">{question}</span>
           {/* 复制按钮 */}
           {showQuestionCopy && (
-            <CopyButton text={question} className="absolute right-0 -bottom-6" />
+            <CopyButton key={question} text={question} className="absolute right-0 -bottom-6" />
           )}
         </div>
       </div>
@@ -64,7 +64,7 @@ export default function ChatMessage({
         />
         {/* 复制按钮 */}
         {showAnswerCopy && answerRaw && (
-          <CopyButton text={answerRaw} className="absolute left-0 -bottom-6" />
+          <CopyButton key={answerRaw} text={answerRaw} className="absolute left-0 -bottom-6" />
         )}
       </div>
     </div>

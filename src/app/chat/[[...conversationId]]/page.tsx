@@ -89,6 +89,84 @@ export default function Page(props: IProps) {
     handleScrollToBottom,
   } = useScrollControl(isFetching, [chatList])
 
+  // 逐字渲染缓冲区
+  const pendingTextRef = useRef('')
+  const animFrameRef = useRef<ReturnType<typeof requestAnimationFrame> | undefined>(undefined)
+  const streamEndedRef = useRef(false)
+
+  const clearPendingText = () => {
+    if (animFrameRef.current !== undefined) {
+      cancelAnimationFrame(animFrameRef.current)
+      animFrameRef.current = undefined
+    }
+    pendingTextRef.current = ''
+    streamEndedRef.current = false
+  }
+
+  const flushPendingText = () => {
+    if (animFrameRef.current !== undefined) {
+      cancelAnimationFrame(animFrameRef.current)
+      animFrameRef.current = undefined
+    }
+    if (pendingTextRef.current) {
+      const remaining = pendingTextRef.current
+      pendingTextRef.current = ''
+      setChatList(prevState => {
+        if (!prevState.length) return prevState
+        return [
+          ...prevState.slice(0, prevState.length - 1),
+          {
+            ...prevState.at(-1)!,
+            streamingAnswer: (prevState.at(-1)?.streamingAnswer || '') + remaining,
+          },
+        ]
+      })
+    }
+  }
+
+  const startCharDrain = () => {
+    if (animFrameRef.current !== undefined) return
+    const drain = () => {
+      if (!pendingTextRef.current.length) {
+        animFrameRef.current = undefined
+        streamEndedRef.current = false
+        return
+      }
+      const bufferLen = pendingTextRef.current.length
+      let charsPerFrame: number
+      if (streamEndedRef.current) {
+        // 流结束后加速输出，约0.3秒内输出完毕
+        charsPerFrame = Math.max(3, Math.ceil(bufferLen / 20))
+      } else {
+        // 流进行中，自适应速度匹配后端
+        charsPerFrame = Math.min(10, Math.max(1, Math.ceil(bufferLen / 5)))
+      }
+      const chars = pendingTextRef.current.slice(0, charsPerFrame)
+      pendingTextRef.current = pendingTextRef.current.slice(charsPerFrame)
+      setChatList(prevState => {
+        if (!prevState.length) return prevState
+        return [
+          ...prevState.slice(0, prevState.length - 1),
+          {
+            ...prevState.at(-1)!,
+            streamingAnswer: (prevState.at(-1)?.streamingAnswer || '') + chars,
+          },
+        ]
+      })
+      animFrameRef.current = requestAnimationFrame(drain)
+    }
+    animFrameRef.current = requestAnimationFrame(drain)
+  }
+
+  // 组件卸载时清理动画帧
+  useEffect(() => {
+    return () => {
+      if (animFrameRef.current !== undefined) {
+        cancelAnimationFrame(animFrameRef.current)
+      }
+    }
+  }, [])
+
   const fetchHistory = async () => {
     const result = await baseFetch({
       url: 'ai/getHistoryById',
@@ -140,8 +218,10 @@ export default function Page(props: IProps) {
   }
 
   const clickNewChat = () => {
+    clearPendingText()
     closeSSEConnection()
     resetChatList()
+    setActiveCopyIndex(null)
     // 重置会话ID并更新URL（仅更新URL，不触发导航）
     conversationIdRef.current = undefined
     window.history.pushState(null, '', '/next/chat')
@@ -149,11 +229,13 @@ export default function Page(props: IProps) {
 
   // 选择历史会话
   const handleSelectHistory = async (conversationId: string) => {
+    clearPendingText()
     closeSSEConnection()
     resetChatList()
-    // 更新会话ID和URL
+    setActiveCopyIndex(null)
+    // 更新会话ID和URL（使用 replaceState 避免回退到上一次会话）
     conversationIdRef.current = conversationId
-    window.history.pushState(null, '', `/next/chat/${conversationId}`)
+    window.history.replaceState(null, '', `/next/chat/${conversationId}`)
     // 获取历史数据
     await fetchHistory()
   }
@@ -163,6 +245,7 @@ export default function Page(props: IProps) {
     // 查询id获取的,不是用户触发的
     if (chatList.at(-1)!.streamingAnswer) return
 
+    clearPendingText()
     closeSSEConnection()
 
     setIsFetching(true)
@@ -187,19 +270,15 @@ export default function Page(props: IProps) {
           }
         }
         if (streamData.code === 200 && streamData.data.partialAnswer?.trim()) {
-          setChatList(prevState => [
-            ...prevState.slice(0, prevState.length - 1),
-            {
-              ...prevState.at(-1)!,
-              streamingAnswer: (prevState.at(-1)?.streamingAnswer || '') + streamData.data.partialAnswer,
-            },
-          ])
+          pendingTextRef.current += streamData.data.partialAnswer
+          startCharDrain()
         }
       },
     })
 
     if (!result.isOk && result.reason !== 'AbortError') {
       console.error('POST 流式请求失败：', result.reason)
+      clearPendingText()
       setChatList(prevState => [
         ...prevState.slice(0, prevState.length - 1),
         {
@@ -209,11 +288,16 @@ export default function Page(props: IProps) {
       ])
     }
 
+    // 流结束，加速输出剩余缓冲内容（而非瞬间全部输出）
+    if (pendingTextRef.current.length) {
+      streamEndedRef.current = true
+    }
     closeSSEConnection()
   }
 
   // 停止请求
   const clickStopFetch = () => {
+    flushPendingText()
     closeSSEConnection()
   }
   useEffect(() => {
@@ -241,9 +325,12 @@ export default function Page(props: IProps) {
   // 优化 renderMarkdown 函数，增加 XSS 过滤
   const renderMarkdown = (content: string | undefined): string => {
     if (!content) return ''
-    // 先解析 Markdown，再过滤危险 HTML 标签/属性
     const htmlContent = marked.parse(content) as string
-    return xss(htmlContent) // 防止 XSS 攻击
+    const sanitized = xss(htmlContent)
+    // 为表格添加可滚动容器，优化移动端显示
+    return sanitized
+      .replace(/<table\b[^>]*>/g, '<div class="table-wrapper">$&')
+      .replace(/<\/table>/g, '</table></div>')
   }
 
   const textareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -256,7 +343,7 @@ export default function Page(props: IProps) {
   }
 
   return (
-    <div className={'w-full h-full flex flex-col overflow-auto'}>
+    <div className={'w-full h-full flex flex-col overflow-y-auto overflow-x-hidden'}>
       {/*头部*/}
       <div className={'w-full px-4 h-12 flex justify-between items-center'}>
         {/* 左侧按钮组 */}
@@ -297,45 +384,47 @@ export default function Page(props: IProps) {
       <div
         className={'w-full flex h-[calc(100%-48px)]'}
       >
-        <div className={'grow h-full py-5 flex flex-col justify-center items-center gap-y-6'}>
-          {/* 内容区 */}
+        <div className={'grow min-w-0 h-full pb-5 flex flex-col justify-center items-center gap-y-6'}>
+          {/* 内容区 - 全屏宽度可滚动 */}
           <div ref={containerRef}
-               className={`w-4/5 max-w-200 relative flex flex-col overflow-auto ${chatList.length ? 'grow' : ''}`}>
-            {
-              !chatList.length && (
-                <div className="w-full flex flex-col justify-center items-center gap-y-2">
-                  <span className="mb-5 h-9 text-black font-bold text-2xl">{helpContent}</span>
-                </div>
-              )
-            }
-            {
-              !!chatList.length && (
-                <div className={'w-full flex flex-col gap-y-13'}>
-                  {
-                    chatList.map((item, index) => (
-                      <ChatMessage
-                        key={index}
-                        question={item.question}
-                        answerHtml={renderMarkdown(item.streamingAnswer)}
-                        answerRaw={item.streamingAnswer}
-                        index={index}
-                        isAnswerComplete={!isFetching || index !== chatList.length - 1}
-                        isLastItem={index === chatList.length - 1}
-                        activeCopyIndex={activeCopyIndex}
-                        onActiveCopyIndexChange={setActiveCopyIndex}
-                      />
-                    ))
-                  }
-                </div>
-              )
-            }
+               className={`w-full pt-5 relative flex flex-col items-center overflow-y-auto overflow-x-hidden ${chatList.length ? 'grow' : ''}`}>
+            <div className="w-4/5 max-w-200 flex flex-col">
+              {
+                !chatList.length && (
+                  <div className="w-full flex flex-col justify-center items-center gap-y-2">
+                    <span className="mb-5 h-9 text-black font-bold text-2xl">{helpContent}</span>
+                  </div>
+                )
+              }
+              {
+                !!chatList.length && (
+                  <div className={'w-full flex flex-col gap-y-13'}>
+                    {
+                      chatList.map((item, index) => (
+                        <ChatMessage
+                          key={index}
+                          question={item.question}
+                          answerHtml={renderMarkdown(item.streamingAnswer)}
+                          answerRaw={item.streamingAnswer}
+                          index={index}
+                          isAnswerComplete={!isFetching || index !== chatList.length - 1}
+                          isLastItem={index === chatList.length - 1}
+                          activeCopyIndex={activeCopyIndex}
+                          onActiveCopyIndexChange={setActiveCopyIndex}
+                        />
+                      ))
+                    }
+                  </div>
+                )
+              }
+            </div>
           </div>
           {/* 用户交互区 */}
           <div className={'relative w-4/5 max-w-200 rounded-2xl border border-[#e0e0e0] flex flex-col p-3'}>
             {/* 滚动到底部按钮 */}
             {(showScrollBtn) && (
               <button
-                className="absolute -top-20 left-1/2 -translate-x-1/2 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-10"
+                className="absolute -top-12 left-1/2 -translate-x-1/2 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors z-10"
                 onClick={handleScrollToBottom}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2}
