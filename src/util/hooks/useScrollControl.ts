@@ -35,6 +35,7 @@ export function useScrollControl(
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const [showScrollBtn, setShowScrollBtn] = useState(false)
+  const smoothScrollingRef = useRef(false)
 
   // 滚动到底部
   const scrollToBottom = (smooth = false) => {
@@ -80,6 +81,53 @@ export function useScrollControl(
     return () => container.removeEventListener('scroll', handleScroll)
   }, [isFetching, threshold])
 
+  // 移动端触摸事件：轻触/轻滑即可禁止自动滚动
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    let touchStartY = 0
+
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0].clientY
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const touchY = e.touches[0].clientY
+      // 用户向上滑动（手指上移）- 2px阈值避免误触
+      if (touchStartY - touchY > 2) {
+        setAutoScroll(false)
+      }
+    }
+
+    container.addEventListener('touchstart', handleTouchStart, {passive: true})
+    container.addEventListener('touchmove', handleTouchMove, {passive: true})
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart)
+      container.removeEventListener('touchmove', handleTouchMove)
+    }
+  }, [])
+
+  // 监听窗口大小变化（处理移动端输入面板弹起/收起）
+  useEffect(() => {
+    const checkScrollPosition = () => {
+      requestAnimationFrame(() => {
+        const container = containerRef.current
+        if (!container) return
+        const {scrollTop, scrollHeight, clientHeight} = container
+        const isAtBottom = scrollHeight - scrollTop - clientHeight < threshold
+        setShowScrollBtn(!isAtBottom)
+      })
+    }
+    const viewport = window.visualViewport
+    if (viewport) {
+      viewport.addEventListener('resize', checkScrollPosition)
+      return () => viewport.removeEventListener('resize', checkScrollPosition)
+    }
+    window.addEventListener('resize', checkScrollPosition)
+    return () => window.removeEventListener('resize', checkScrollPosition)
+  }, [threshold])
+
   // 内容变化时，检查容器是否还需要滚动，不需要则隐藏按钮
   useEffect(() => {
     const container = containerRef.current
@@ -93,7 +141,7 @@ export function useScrollControl(
 
   // 自动滚动到底部
   useLayoutEffect(() => {
-    if (!containerRef.current || !autoScroll) return
+    if (!containerRef.current || !autoScroll || smoothScrollingRef.current) return
     scrollToBottom()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, autoScroll])
@@ -109,10 +157,16 @@ export function useScrollControl(
   // 点击滚动到底部按钮
   const handleScrollToBottom = () => {
     scrollToBottom(true)
-    if (isFetching) {
-      setAutoScroll(true)
-    }
     setShowScrollBtn(false)
+    if (isFetching) {
+      // 短暂抑制即时自动滚动，让smooth动画播放
+      smoothScrollingRef.current = true
+      setAutoScroll(true)
+      setTimeout(() => {
+        smoothScrollingRef.current = false
+        scrollToBottom()
+      }, 400)
+    }
   }
 
   return {
